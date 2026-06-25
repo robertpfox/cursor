@@ -1,0 +1,52 @@
+{
+  "mcpServers": {
+    "MCP_DOCKER": {
+      "command": "docker",
+      "args": ["mcp", "gateway", "run"],
+      "env": {
+        "LOCALAPPDATA": "C:\\Users\\IT\\AppData\\Local",
+        "ProgramData": "C:\\ProgramData",
+        "ProgramFiles": "C:\\Program Files"
+      }
+    },
+    "tradingview": {
+      "command": "node",
+      "args": [
+        "C:/cursor/cursor-agents/tradingview-mcp-main/src/server.js"
+      ],
+      "env": {
+        "TRADINGVIEW_EXECUTABLE": "C:\\Program Files\\WindowsApps\\TradingView.Desktop_3.0.0.7652_x64__n534cwy3pjxzj\\TradingView.exe",
+        "TRADINGVIEW_EXTRA_ARGS": "--disable-gpu --force-cpu-draw"
+      }
+    },
+    "composio": {
+      "url": "https://connect.composio.dev/mcp"
+    },
+    "grok-mcp": {
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:/Users/IT/.openclaw/scripts/grok-mcp-launcher.ps1"
+      ]
+    },
+    "openclaw": {
+      "command": "openclaw",
+      "args": [
+        "mcp",
+        "serve",
+        "--url",
+        "ws://127.0.0.1:18789",
+        "--token-file",
+        "C:/Users/IT/.openclaw/gateway.token"
+      ]
+    },
+    "google-home": {
+      "command": "npx",
+      "args": ["tsx", "mcp/server.ts"],
+      "cwd": "C:/cursor/cursor-agents/google-home-api"
+    }
+  }
+}
