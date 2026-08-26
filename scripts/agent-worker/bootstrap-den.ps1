@@ -1,0 +1,171 @@
+<#
+.SYNOPSIS
+    One-shot bootstrap: get this repo onto the Den Computer and start the
+    My Machines worker.
+
+.DESCRIPTION
+    Safe to paste as:
+
+      irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/bootstrap-den.ps1 | iex
+
+    or to run from a clone of this repo. It:
+
+      1. Finds or clones github.com/robertpfox/cursor
+      2. Checks out the worker branch
+      3. Runs install-den.ps1 (CLI + scheduled task + start)
+
+    If this Windows user is not signed in, install-den.ps1 runs `agent login`
+    (browser) before starting the worker.
+
+.PARAMETER RepoUrl
+    Git remote. Default: https://github.com/robertpfox/cursor.git
+
+.PARAMETER Branch
+    Branch that contains the worker scripts.
+
+.PARAMETER WorkerDir
+    Existing checkout. Detected automatically when omitted.
+#>
+
+[CmdletBinding()]
+param(
+    [string]$RepoUrl = 'https://github.com/robertpfox/cursor.git',
+    [string]$Branch = 'cursor/agent-worker-start-4281',
+    [string]$WorkerDir
+)
+
+$ErrorActionPreference = 'Stop'
+
+function Write-BootStep($message) { Write-Host "==> $message" -ForegroundColor Cyan }
+function Write-BootOk($message) { Write-Host "    $([char]0x2713) $message" -ForegroundColor Green }
+
+function Test-CursorConfigRepo([string]$Path) {
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return $false }
+    if (Test-Path -LiteralPath (Join-Path $Path 'scripts\agent-worker\install-den.ps1')) { return $true }
+    if (-not (Test-Path -LiteralPath (Join-Path $Path '.git'))) { return $false }
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) { return $false }
+    Push-Location $Path
+    try {
+        $remote = (git remote get-url origin 2>$null)
+        return [bool]($remote -and ($remote -match 'robertpfox/cursor'))
+    } finally {
+        Pop-Location
+    }
+}
+
+function Install-FromGithubZip([string]$Dest) {
+    $encoded = [uri]::EscapeDataString($Branch)
+    $zipUrl = "https://github.com/robertpfox/cursor/archive/refs/heads/$encoded.zip"
+    $zipPath = Join-Path $env:TEMP 'cursor-agent-worker.zip'
+    $extractRoot = Join-Path $env:TEMP 'cursor-agent-worker-extract'
+    Write-BootStep "Downloading $zipUrl"
+    if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
+    if (Test-Path -LiteralPath $extractRoot) { Remove-Item -LiteralPath $extractRoot -Recurse -Force }
+    Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing
+    Expand-Archive -Path $zipPath -DestinationPath $extractRoot -Force
+    $installer = Get-ChildItem -Path $extractRoot -Recurse -Filter 'install-den.ps1' |
+        Where-Object { $_.Directory.Name -eq 'agent-worker' } |
+        Select-Object -First 1
+    if (-not $installer) { throw "Zip from $zipUrl did not contain scripts\\agent-worker\\install-den.ps1" }
+    $sourceRoot = $installer.Directory.Parent.Parent.FullName
+    New-Item -ItemType Directory -Path $Dest -Force | Out-Null
+    Copy-Item -Path (Join-Path $sourceRoot '*') -Destination $Dest -Recurse -Force
+    return (Resolve-Path $Dest).Path
+}
+
+function Resolve-WorkerDir {
+    param([string]$Hint)
+    if ($Hint -and (Test-CursorConfigRepo $Hint)) { return (Resolve-Path $Hint).Path }
+
+    $here = (Get-Location).Path
+    if (Test-CursorConfigRepo $here) { return $here }
+
+    $scriptDir = $PSScriptRoot
+    if ($scriptDir) {
+        $fromScript = (Resolve-Path (Join-Path $scriptDir '..\..')).Path
+        if (Test-CursorConfigRepo $fromScript) { return $fromScript }
+    }
+
+    foreach ($candidate in @('C:\cursor', (Join-Path $env:USERPROFILE 'cursor'), (Join-Path $env:USERPROFILE 'src\cursor'))) {
+        if (Test-CursorConfigRepo $candidate) { return $candidate }
+    }
+
+    $cloneTo = 'C:\cursor'
+    if ((Test-Path -LiteralPath $cloneTo) -and -not (Test-Path -LiteralPath (Join-Path $cloneTo '.git'))) {
+        $cloneTo = Join-Path $env:USERPROFILE 'cursor'
+    }
+
+    Write-BootStep "Fetching $RepoUrl ($Branch) -> $cloneTo"
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        if (Test-Path -LiteralPath (Join-Path $cloneTo '.git')) {
+            return (Resolve-Path $cloneTo).Path
+        }
+        $parent = Split-Path $cloneTo
+        if ($parent) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+        git clone --branch $Branch --single-branch $RepoUrl $cloneTo
+        return (Resolve-Path $cloneTo).Path
+    }
+    return Install-FromGithubZip $cloneTo
+}
+
+Write-Host ''
+Write-Host '  Den Computer My Machines bootstrap' -ForegroundColor White
+Write-Host ''
+
+if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
+    $names = @()
+    foreach ($line in (& wsl.exe -l -q 2>$null)) {
+        $clean = (($line -replace "`0", '')).Trim()
+        if ($clean) { $names += $clean }
+    }
+    $usable = @($names | Where-Object { $_ -and ($_ -notmatch '^(docker-desktop|docker-desktop-data|podman-machine|rancher-desktop)') })
+    $distro = $null
+    foreach ($want in @('Ubuntu', 'Ubuntu-24.04', 'Ubuntu-22.04', 'Ubuntu-20.04')) {
+        $hit = $usable | Where-Object { $_ -eq $want } | Select-Object -First 1
+        if ($hit) { $distro = [string]$hit; break }
+    }
+    if (-not $distro) { $distro = $usable | Where-Object { $_ -like 'Ubuntu*' } | Select-Object -First 1 }
+    if ($distro) {
+        Write-BootStep 'WSL is ready; using the Linux CLI (Windows agent worker currently crashes)'
+        Write-BootOk "distro $distro (not docker-desktop)"
+        wsl.exe -d $distro -- bash -lic "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/den.sh -o /tmp/den.sh && exec bash /tmp/den.sh"
+        $wslCode = $LASTEXITCODE
+        $taskName = 'CursorAgentWorker'
+        $launcherDir = Join-Path $env:LOCALAPPDATA 'CursorAgentWorker'
+        New-Item -ItemType Directory -Path $launcherDir -Force | Out-Null
+        $cmdPath = Join-Path $launcherDir 'start-den-wsl.cmd'
+        @(
+            '@echo off',
+            "wsl.exe -d $distro -e bash -lc `"exec bash `$HOME/.local/share/cursor-agent-worker/wsl-worker-loop.sh`""
+        ) | Set-Content -Path $cmdPath -Encoding ASCII
+        $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        if ($existing) {
+            Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+        }
+        $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$cmdPath`""
+        $trigger = New-ScheduledTaskTrigger -AtLogOn
+        $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings `
+            -Description 'Cursor My Machines worker (den-computer) via WSL' | Out-Null
+        Write-BootOk "scheduled task $taskName (WSL worker at logon)"
+        exit $wslCode
+    }
+    Write-Host '    ! WSL exists but no Ubuntu distro was found. Installing Ubuntu (UAC / reboot may be required).' -ForegroundColor Yellow
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    wsl.exe --install -d Ubuntu
+    $ErrorActionPreference = $prev
+    if ($LASTEXITCODE -ne 0) {
+        Start-Process -FilePath 'wsl.exe' -ArgumentList '--install','-d','Ubuntu' -Verb RunAs -Wait
+    }
+    Write-Host '      If Windows asked for a reboot, reboot, then paste this one-liner again.' -ForegroundColor Yellow
+} else {
+    Write-Host '    ! WSL is not installed. The native Windows CLI currently crashes (better-sqlite3 ABI).' -ForegroundColor Yellow
+    Write-Host '      Installing Ubuntu WSL (UAC / reboot may be required).' -ForegroundColor Yellow
+    Start-Process -FilePath "$env:SystemRoot\System32\wsl.exe" -ArgumentList '--install','-d','Ubuntu' -Verb RunAs -Wait
+    Write-Host '      If Windows asked for a reboot, reboot, then paste this one-liner again.' -ForegroundColor Yellow
+}
+
+Write-Host 'Refusing to start the broken native Windows CLI. Use Ubuntu WSL.' -ForegroundColor Yellow
+exit 1
