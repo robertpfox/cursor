@@ -113,16 +113,37 @@ Write-Host '  Den Computer My Machines bootstrap' -ForegroundColor White
 Write-Host ''
 
 if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
-    wsl.exe -e true 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) {
+    $names = @()
+    foreach ($line in (& wsl.exe -l -q 2>$null)) {
+        $clean = (($line -replace "`0", '')).Trim()
+        if ($clean) { $names += $clean }
+    }
+    $usable = @($names | Where-Object { $_ -and ($_ -notmatch '^(docker-desktop|docker-desktop-data|podman-machine|rancher-desktop)') })
+    $distro = $null
+    foreach ($want in @('Ubuntu', 'Ubuntu-24.04', 'Ubuntu-22.04', 'Ubuntu-20.04')) {
+        $hit = $usable | Where-Object { $_ -eq $want } | Select-Object -First 1
+        if ($hit) { $distro = [string]$hit; break }
+    }
+    if (-not $distro) { $distro = $usable | Where-Object { $_ -like 'Ubuntu*' } | Select-Object -First 1 }
+    if (-not $distro) { $distro = $usable | Select-Object -First 1 }
+    $probe = if ($distro) { & wsl.exe -d $distro -e true 2>$null; $LASTEXITCODE } else { 1 }
+    if ($probe -eq 0) {
         Write-BootStep 'WSL is ready; using the Linux CLI (Windows agent worker currently crashes)'
-        wsl.exe -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/scripts/agent-worker/install-den-wsl.sh | bash"
+        if ($distro) { Write-BootOk "distro $distro (not docker-desktop)" }
+        if ($distro) {
+            wsl.exe -d $distro -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/scripts/agent-worker/install-den-wsl.sh | bash"
+        } else {
+            wsl.exe -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/scripts/agent-worker/install-den-wsl.sh | bash"
+        }
         $wslCode = $LASTEXITCODE
         $taskName = 'CursorAgentWorker'
-        $cmdPath = Join-Path $env:TEMP 'start-den-wsl.cmd'
+        $launcherDir = Join-Path $env:LOCALAPPDATA 'CursorAgentWorker'
+        New-Item -ItemType Directory -Path $launcherDir -Force | Out-Null
+        $cmdPath = Join-Path $launcherDir 'start-den-wsl.cmd'
+        $distroFlag = if ($distro) { "-d $distro " } else { '' }
         @(
             '@echo off',
-            'wsl.exe -e bash -lc "export PATH=$HOME/.local/bin:$PATH; exec bash $HOME/cursor/scripts/agent-worker/wsl-worker-loop.sh"'
+            "wsl.exe ${distroFlag}-e bash -lc `"exec bash `$HOME/.local/share/cursor-agent-worker/wsl-worker-loop.sh`""
         ) | Set-Content -Path $cmdPath -Encoding ASCII
         $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
         if ($existing) {

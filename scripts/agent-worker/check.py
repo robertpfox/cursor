@@ -116,10 +116,14 @@ def main() -> int:
         errors.append("install-den-wsl.sh fallback loop must pass --wait before start")
     if "CursorAgentWorker" not in wsl_install or "schtasks" not in wsl_install:
         errors.append("install-den-wsl.sh must register Windows logon task CursorAgentWorker via schtasks")
+    if "WSL_DISTRO_NAME" not in wsl_install:
+        errors.append("install-den-wsl.sh logon task must pin the current WSL distro")
     if ".local/share/cursor-agent-worker/wsl-worker-loop.sh" not in wsl_install:
         errors.append("install-den-wsl.sh must persist the restart loop outside /tmp")
 
     common = (SCRIPTS / "common.ps1").read_text(encoding="utf-8")
+    if "Get-AgentWorkerWslDistro" not in common or "docker-desktop" not in common:
+        errors.append("common.ps1 must pick an Ubuntu WSL distro and skip docker-desktop")
     if "agent.exe" not in common or r"\.ps1$" not in common:
         errors.append("common.ps1 must prefer agent.exe/agent.cmd over agent.ps1 for the scheduled task")
     if "Get-ChildItem" not in common or "Recurse" not in common:
@@ -147,7 +151,8 @@ def main() -> int:
         encoding="utf-8"
     ):
         errors.append("Missing VS Code task to start the Den Computer WSL worker")
-    if "install-den-wsl.sh" not in readme or "wsl -e bash" not in readme:
+    if "install-den-wsl.sh" not in readme or "wsl -d Ubuntu" not in readme:
+        errors.append("README must lead with the WSL curl|bash one-liner targeting Ubuntu")
         errors.append("README must lead with the WSL curl|bash one-liner")
     if "Start-DenComputer-Worker.cmd" not in readme:
         errors.append("README must mention the double-click WSL launcher")

@@ -13,10 +13,42 @@ function Write-AgentWorkerStep($message) { Write-Host "==> $message" -Foreground
 function Write-AgentWorkerOk($message) { Write-Host "    $([char]0x2713) $message" -ForegroundColor Green }
 function Write-AgentWorkerWarn($message) { Write-Host "    ! $message" -ForegroundColor Yellow }
 
+function Get-AgentWorkerWslDistro {
+    if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) { return $null }
+    $names = @()
+    foreach ($line in (& wsl.exe -l -q 2>$null)) {
+        $clean = (($line -replace "`0", '') -replace [char]0xFEFF, '').Trim()
+        if ($clean) { $names += $clean }
+    }
+    $skip = [regex]'^(docker-desktop|docker-desktop-data|podman-machine|rancher-desktop)'
+    $usable = $names | Where-Object { $_ -and ($_ -notmatch $skip) }
+    foreach ($want in @('Ubuntu', 'Ubuntu-24.04', 'Ubuntu-22.04', 'Ubuntu-20.04')) {
+        $hit = $usable | Where-Object { $_ -eq $want } | Select-Object -First 1
+        if ($hit) { return [string]$hit }
+    }
+    $ubuntu = $usable | Where-Object { $_ -like 'Ubuntu*' } | Select-Object -First 1
+    if ($ubuntu) { return [string]$ubuntu }
+    return ($usable | Select-Object -First 1)
+}
+
+function Invoke-AgentWorkerWsl {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$WslArgs
+    )
+    $distro = Get-AgentWorkerWslDistro
+    if ($distro) {
+        & wsl.exe -d $distro @WslArgs
+        return $LASTEXITCODE
+    }
+    & wsl.exe @WslArgs
+    return $LASTEXITCODE
+}
+
 function Test-AgentWorkerWsl {
     if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) { return $false }
-    wsl.exe -e true 2>$null | Out-Null
-    return ($LASTEXITCODE -eq 0)
+    $code = Invoke-AgentWorkerWsl -WslArgs @('-e', 'true')
+    return ($code -eq 0)
 }
 
 function Test-AgentWorkerAdmin {

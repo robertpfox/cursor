@@ -59,19 +59,34 @@ if (Test-AgentWorkerWsl) {
     Write-AgentWorkerStep 'Windows native agent worker crashes on exec-daemon (better-sqlite3 ABI). Using WSL.'
     $wslInstaller = Join-Path $PSScriptRoot 'install-den-wsl.sh'
     $unixInstaller = $null
+    $distro = Get-AgentWorkerWslDistro
+    if ($distro) { Write-AgentWorkerOk "WSL distro $distro (skipping docker-desktop)" }
     if (Test-Path -LiteralPath $wslInstaller) {
-        $unixInstaller = (wsl.exe wslpath -a $wslInstaller 2>$null)
+        $unixInstaller = if ($distro) {
+            (wsl.exe -d $distro wslpath -a $wslInstaller 2>$null)
+        } else {
+            (wsl.exe wslpath -a $wslInstaller 2>$null)
+        }
         if ($unixInstaller) { $unixInstaller = [string]$unixInstaller.Trim() }
     }
     if ($unixInstaller) {
-        wsl.exe -e bash $unixInstaller
+        $wslCode = Invoke-AgentWorkerWsl -WslArgs @('-e', 'bash', $unixInstaller)
     } else {
-        wsl.exe -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh | bash"
+        $wslCode = Invoke-AgentWorkerWsl -WslArgs @(
+            '-e', 'bash', '-lc',
+            'curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh | bash'
+        )
     }
-    $wslCode = $LASTEXITCODE
 
     Write-AgentWorkerStep 'Registering a logon task that keeps the WSL worker up'
-    $wslCmd = Join-Path $PSScriptRoot 'start-den-wsl.cmd'
+    $launcherDir = Join-Path $env:LOCALAPPDATA 'CursorAgentWorker'
+    New-Item -ItemType Directory -Path $launcherDir -Force | Out-Null
+    $wslCmd = Join-Path $launcherDir 'start-den-wsl.cmd'
+    $distroFlag = if ($distro) { "-d $distro " } else { '' }
+    @(
+        '@echo off',
+        "wsl.exe ${distroFlag}-e bash -lc `"exec bash `$HOME/.local/share/cursor-agent-worker/wsl-worker-loop.sh`""
+    ) | Set-Content -Path $wslCmd -Encoding ASCII
     $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($existing) {
         Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue

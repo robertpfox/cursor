@@ -157,9 +157,9 @@ register_windows_logon_task() {
   fi
   launcher_dir="${win_profile_unix}/AppData/Local/CursorAgentWorker"
   mkdir -p "$launcher_dir"
-  cat >"${launcher_dir}/start-den-wsl.cmd" <<'EOF'
+  cat >"${launcher_dir}/start-den-wsl.cmd" <<EOF
 @echo off
-wsl.exe -e bash -lc "exec bash $HOME/.local/share/cursor-agent-worker/wsl-worker-loop.sh"
+wsl.exe ${WSL_DISTRO_NAME:+-d ${WSL_DISTRO_NAME} }-e bash -lc "exec bash \$HOME/.local/share/cursor-agent-worker/wsl-worker-loop.sh"
 EOF
   launcher_win="$(wslpath -w "${launcher_dir}/start-den-wsl.cmd" 2>/dev/null || true)"
   if [[ -z "${launcher_win:-}" ]]; then
