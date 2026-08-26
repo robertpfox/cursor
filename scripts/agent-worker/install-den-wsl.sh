@@ -99,9 +99,12 @@ if [[ -z "${CURSOR_API_KEY:-}" ]]; then
   fi
 fi
 
-LOOP="${ROOT}/scripts/agent-worker/wsl-worker-loop.sh"
-if [[ ! -f "$LOOP" ]]; then
-  LOOP="${TMPDIR:-/tmp}/wsl-worker-loop.sh"
+# Always install the restart loop under DATA_DIR so a failed git clone
+# (or a later WSL tmp wipe) cannot lose the worker.
+LOOP="${DATA_DIR}/wsl-worker-loop.sh"
+if [[ -f "${ROOT}/scripts/agent-worker/wsl-worker-loop.sh" ]]; then
+  cp -f "${ROOT}/scripts/agent-worker/wsl-worker-loop.sh" "$LOOP"
+else
   cat >"$LOOP" <<'EOF'
 #!/usr/bin/env bash
 set -u
@@ -112,7 +115,7 @@ DATA_DIR="${CURSOR_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/cursor-agent-w
 MGMT="${CURSOR_WORKER_MANAGEMENT_ADDR:-127.0.0.1:18791}"
 ENV_FILE="${ROOT}/.cursor/agent-worker.env"
 LOG="${ROOT}/logs/agent-worker.log"
-mkdir -p "$(dirname "$LOG")" "$DATA_DIR"
+mkdir -p "$ROOT" "$(dirname "$LOG")" "$DATA_DIR"
 if [[ -f "$ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
@@ -131,8 +134,44 @@ while true; do
   sleep 10
 done
 EOF
-  chmod +x "$LOOP"
 fi
+chmod +x "$LOOP"
+
+register_windows_logon_task() {
+  local schtasks cmd_exe win_profile win_profile_unix launcher_dir launcher_win
+  schtasks="/mnt/c/Windows/System32/schtasks.exe"
+  cmd_exe="/mnt/c/Windows/System32/cmd.exe"
+  if [[ ! -x "$schtasks" || ! -x "$cmd_exe" ]]; then
+    echo "    (not Windows WSL; skipping CursorAgentWorker logon task)"
+    return 0
+  fi
+  win_profile="$("$cmd_exe" /c "echo %USERPROFILE%" 2>/dev/null | tr -d '\r' | tail -n 1 || true)"
+  if [[ -z "${win_profile:-}" || "${win_profile}" == *'%USERPROFILE%'* ]]; then
+    echo "    ! could not resolve %USERPROFILE%; skipping logon task"
+    return 0
+  fi
+  win_profile_unix="$(wslpath -u "$win_profile" 2>/dev/null || true)"
+  if [[ -z "${win_profile_unix:-}" ]]; then
+    echo "    ! wslpath failed for $win_profile; skipping logon task"
+    return 0
+  fi
+  launcher_dir="${win_profile_unix}/AppData/Local/CursorAgentWorker"
+  mkdir -p "$launcher_dir"
+  cat >"${launcher_dir}/start-den-wsl.cmd" <<'EOF'
+@echo off
+wsl.exe -e bash -lc "exec bash $HOME/.local/share/cursor-agent-worker/wsl-worker-loop.sh"
+EOF
+  launcher_win="$(wslpath -w "${launcher_dir}/start-den-wsl.cmd" 2>/dev/null || true)"
+  if [[ -z "${launcher_win:-}" ]]; then
+    echo "    ! wslpath failed for launcher; skipping logon task"
+    return 0
+  fi
+  if "$schtasks" /Create /F /TN CursorAgentWorker /SC ONLOGON /RL LIMITED /TR "cmd.exe /c \"${launcher_win}\"" >/dev/null 2>&1; then
+    echo "    registered Windows logon task CursorAgentWorker"
+  else
+    echo "    ! schtasks could not create CursorAgentWorker (not fatal; worker still started)"
+  fi
+}
 
 echo "==> Starting $NAME (restart loop)"
 pid_file="${LOG_DIR}/wsl-worker-loop.pid"
@@ -145,6 +184,7 @@ if [[ -f "$pid_file" ]]; then
 fi
 nohup bash "$LOOP" >/dev/null 2>&1 &
 echo $! >"$pid_file"
+register_windows_logon_task
 
 ready=0
 for _ in $(seq 1 60); do

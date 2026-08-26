@@ -34,7 +34,7 @@ git checkout cursor/agent-worker-start-4281
 powershell -ExecutionPolicy Bypass -File .\scripts\agent-worker\install-den.ps1
 ```
 
-Or double-click `scripts\agent-worker\start-den-worker.cmd`.
+Or download and double-click `scripts\agent-worker\Start-DenComputer-Worker.cmd` (no clone required). From a clone of this branch, Terminal → Run Task → **Start den-computer My Machines worker (WSL)**.
 
 For boot-without-sign-in, put a *personal* user API key (https://cursor.com/dashboard/api) in `.cursor\agent-worker.env` as `CURSOR_API_KEY=key_...` before running the installer.
 

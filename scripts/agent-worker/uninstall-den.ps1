@@ -31,6 +31,12 @@ foreach ($name in @('run-agent-worker.ps1', 'run-agent-worker.cmd')) {
     }
 }
 
+$wslLauncherDir = Join-Path $env:LOCALAPPDATA 'CursorAgentWorker'
+if (Test-Path -LiteralPath $wslLauncherDir) {
+    Remove-Item -LiteralPath $wslLauncherDir -Recurse -Force
+    Write-AgentWorkerOk 'removed LocalAppData\\CursorAgentWorker'
+}
+
 if ($PurgeData) {
     $dataDir = Get-AgentWorkerDataDir $repoRoot
     if (Test-Path -LiteralPath $dataDir) {

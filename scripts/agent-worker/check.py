@@ -17,6 +17,7 @@ REQUIRED = [
     "bootstrap-den.ps1",
     "start-den-worker.cmd",
     "start-den-wsl.cmd",
+    "Start-DenComputer-Worker.cmd",
     "install-den-wsl.sh",
     "wsl-worker-loop.sh",
     "start.sh",
@@ -113,6 +114,10 @@ def main() -> int:
         errors.append("install-den-wsl.sh must recover from a logs-only leftover ROOT")
     if "--wait --debug start --verbose" not in wsl_install:
         errors.append("install-den-wsl.sh fallback loop must pass --wait before start")
+    if "CursorAgentWorker" not in wsl_install or "schtasks" not in wsl_install:
+        errors.append("install-den-wsl.sh must register Windows logon task CursorAgentWorker via schtasks")
+    if ".local/share/cursor-agent-worker/wsl-worker-loop.sh" not in wsl_install:
+        errors.append("install-den-wsl.sh must persist the restart loop outside /tmp")
 
     common = (SCRIPTS / "common.ps1").read_text(encoding="utf-8")
     if "agent.exe" not in common or r"\.ps1$" not in common:
@@ -133,10 +138,19 @@ def main() -> int:
     uninstall = (SCRIPTS / "uninstall-den.ps1").read_text(encoding="utf-8")
     if "run-agent-worker.ps1" not in uninstall:
         errors.append("uninstall-den.ps1 must remove run-agent-worker.ps1")
+    if "CursorAgentWorker" not in uninstall or "LocalAppData" not in uninstall:
+        errors.append("uninstall-den.ps1 must remove the WSL logon launcher under LocalAppData")
 
     readme = (SCRIPTS / "README.md").read_text(encoding="utf-8")
+    vscode_tasks = ROOT / ".vscode" / "tasks.json"
+    if not vscode_tasks.is_file() or "Start den-computer My Machines worker" not in vscode_tasks.read_text(
+        encoding="utf-8"
+    ):
+        errors.append("Missing VS Code task to start the Den Computer WSL worker")
     if "install-den-wsl.sh" not in readme or "wsl -e bash" not in readme:
         errors.append("README must lead with the WSL curl|bash one-liner")
+    if "Start-DenComputer-Worker.cmd" not in readme:
+        errors.append("README must mention the double-click WSL launcher")
 
     env_example = (SCRIPTS / "agent-worker.env.example").read_text(encoding="utf-8")
     if "CURSOR_API_KEY" not in env_example:
