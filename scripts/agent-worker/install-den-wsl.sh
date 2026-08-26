@@ -31,6 +31,32 @@ if [[ -n "${CURSOR_AGENT:-}" || -n "${CURSOR_AGENT_SOCKET:-}" ]]; then
   fi
 fi
 
+# `wsl -e bash` often lands in docker-desktop. A My Machines worker there is useless.
+# Hop into Ubuntu so older one-liners (without -d Ubuntu) still work.
+if [[ "${AGENT_WORKER_DISTRO_HOP:-}" != "1" ]]; then
+  case "${WSL_DISTRO_NAME:-}" in
+    docker-desktop|docker-desktop-data|podman-machine*|rancher-desktop*)
+      wsl_exe="/mnt/c/Windows/System32/wsl.exe"
+      installer_url="https://raw.githubusercontent.com/robertpfox/cursor/${BRANCH}/scripts/agent-worker/install-den-wsl.sh"
+      if [[ -x "$wsl_exe" ]]; then
+        names="$("$wsl_exe" -l -q 2>/dev/null | tr -d '\0\r' || true)"
+        for d in Ubuntu Ubuntu-24.04 Ubuntu-22.04 Ubuntu-20.04; do
+          hop=""
+          while IFS= read -r line; do
+            if [[ "$line" == "$d" ]]; then hop="$d"; break; fi
+          done <<< "$names"
+          if [[ -n "$hop" ]]; then
+            echo "==> ${WSL_DISTRO_NAME} cannot host the worker. Re-running in $hop"
+            exec env AGENT_WORKER_DISTRO_HOP=1 "$wsl_exe" -d "$hop" -e bash -lc "curl -fsSL $installer_url | bash"
+          fi
+        done
+        echo "No Ubuntu WSL distro found. Install with: wsl --install -d Ubuntu" >&2
+        exit 2
+      fi
+      ;;
+  esac
+fi
+
 echo "==> Ensuring git and curl are installed"
 if ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
