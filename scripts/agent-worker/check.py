@@ -71,6 +71,8 @@ def main() -> int:
         errors.append("install-den.ps1 missing --idle-release-timeout")
     if re.search(r"--pool\b", install):
         errors.append("install-den.ps1 must not pass --pool (My Machines, not pool)")
+    if "agent login" not in install and "'login'" not in install:
+        errors.append("install-den.ps1 must run agent login when unauthenticated")
 
     env_example = (SCRIPTS / "agent-worker.env.example").read_text(encoding="utf-8")
     if "CURSOR_API_KEY" not in env_example:

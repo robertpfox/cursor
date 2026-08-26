@@ -14,8 +14,8 @@
       2. Checks out the worker branch
       3. Runs install-den.ps1 (CLI + scheduled task + start)
 
-    Auth still has to happen on this machine (`agent login` or
-    .cursor\agent-worker.env with a personal CURSOR_API_KEY).
+    If this Windows user is not signed in, install-den.ps1 runs `agent login`
+    (browser) before starting the worker.
 
 .PARAMETER RepoUrl
     Git remote. Default: https://github.com/robertpfox/cursor.git

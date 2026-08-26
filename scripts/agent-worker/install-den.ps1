@@ -68,16 +68,17 @@ Write-AgentWorkerStep 'Checking authentication'
 $hasKey = [bool]$env:CURSOR_API_KEY
 $loggedIn = Test-AgentWorkerAuth -AgentPath $agentPath -ApiKey $env:CURSOR_API_KEY
 if (-not $loggedIn) {
+    Write-AgentWorkerWarn 'Not signed in. Opening the Cursor login browser on this machine...'
+    Remove-Item Env:NO_OPEN_BROWSER -ErrorAction SilentlyContinue
+    & $agentPath login
+    $loggedIn = Test-AgentWorkerAuth -AgentPath $agentPath -ApiKey $env:CURSOR_API_KEY
+}
+if (-not $loggedIn) {
     Write-Host ''
-    Write-Host '  The worker needs a personal Cursor credential.' -ForegroundColor Yellow
-    Write-Host '  Do one of these on this machine, then re-run the installer:'
-    Write-Host ''
-    Write-Host '    agent login'
-    Write-Host ''
-    Write-Host '    or create .cursor\agent-worker.env containing:'
-    Write-Host '      CURSOR_API_KEY=key_...your personal user key...'
-    Write-Host '    from https://cursor.com/dashboard/api'
-    Write-Host '    (personal user keys only — team admin / org / service-account keys are rejected)'
+    Write-Host '  Sign-in did not complete. On this machine either finish `agent login`' -ForegroundColor Yellow
+    Write-Host '  or create .cursor\agent-worker.env containing:'
+    Write-Host '    CURSOR_API_KEY=key_...  (personal user key from https://cursor.com/dashboard/api)'
+    Write-Host '  Team admin / org / service-account keys are rejected for My Machines.'
     Write-Host ''
     exit 1
 }
@@ -182,6 +183,14 @@ if (-not $NoAutoStart) {
     }
     if ($ready) { Write-AgentWorkerOk "worker is answering $healthUrl" }
     else { Write-AgentWorkerWarn "Not answering yet. Check $logFile" }
+
+    Write-AgentWorkerStep 'Asking Cursor whether it can see this machine'
+    $debugJson = & $agentPath @('worker', 'debug', '--json') 2>$null
+    if ($debugJson) {
+        Write-Host $debugJson
+    } else {
+        & $agentPath @('worker', 'debug')
+    }
 }
 
 Write-Host ''
