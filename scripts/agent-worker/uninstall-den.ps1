@@ -23,10 +23,12 @@ Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
 Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
 Write-AgentWorkerOk 'task removed'
 
-$launcher = Join-Path $PSScriptRoot 'run-agent-worker.cmd'
-if (Test-Path -LiteralPath $launcher) {
-    Remove-Item -LiteralPath $launcher -Force
-    Write-AgentWorkerOk 'launcher removed'
+foreach ($name in @('run-agent-worker.ps1', 'run-agent-worker.cmd')) {
+    $launcher = Join-Path $PSScriptRoot $name
+    if (Test-Path -LiteralPath $launcher) {
+        Remove-Item -LiteralPath $launcher -Force
+        Write-AgentWorkerOk "removed $name"
+    }
 }
 
 if ($PurgeData) {

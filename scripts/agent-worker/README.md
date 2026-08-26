@@ -30,7 +30,7 @@ Or double-click `scripts\agent-worker\start-den-worker.cmd`.
 
 For boot-without-sign-in, put a *personal* user API key (https://cursor.com/dashboard/api) in `.cursor\agent-worker.env` as `CURSOR_API_KEY=key_...` before running the installer.
 
-The installer registers a Scheduled Task named `CursorAgentWorker`. As Administrator with an API key it starts at boot as SYSTEM; otherwise it starts at logon as you.
+The installer registers a Scheduled Task named `CursorAgentWorker` that runs `powershell.exe` (so `agent.exe`, `agent.cmd`, and `agent.ps1` all work). As Administrator with an API key it starts at boot as SYSTEM; otherwise it starts at logon as you.
 
 The installer **exits 1** unless `http://127.0.0.1:18791/healthz` answers within 60 seconds. A green "installed" line without that health check is not enough — `den-computer` must also appear under **Run on → My Machines** at [cursor.com/agents](https://cursor.com/agents).
 

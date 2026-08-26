@@ -77,8 +77,12 @@ def main() -> int:
         errors.append("install-den.ps1 must fail if /healthz never answers")
     if "Den Computer worker is installed." in install:
         errors.append("install-den.ps1 must not claim success when the worker may be down")
-    if "start --verbose" not in install:
+    if "start --verbose" not in install and "'--verbose'" not in install:
         errors.append("install-den.ps1 launcher must start the worker with --verbose")
+    if "powershell.exe" not in install:
+        errors.append("install-den.ps1 scheduled task must run powershell.exe so agent.ps1 works")
+    if "run-agent-worker.ps1" not in install:
+        errors.append("install-den.ps1 must write run-agent-worker.ps1")
 
     bootstrap = (SCRIPTS / "bootstrap-den.ps1").read_text(encoding="utf-8")
     if "archive/refs/heads" not in bootstrap:
@@ -91,8 +95,9 @@ def main() -> int:
         errors.append("common.ps1 must prefer agent.exe/agent.cmd over agent.ps1 for the scheduled task")
     if "Get-ChildItem" not in common or "Recurse" not in common:
         errors.append("common.ps1 must search %LOCALAPPDATA%\\cursor-agent recursively for agent.exe")
-    if 'call "$quotedAgent"' not in install:
-        errors.append("install-den.ps1 launcher must call the CLI so .cmd wrappers return to the restart loop")
+    uninstall = (SCRIPTS / "uninstall-den.ps1").read_text(encoding="utf-8")
+    if "run-agent-worker.ps1" not in uninstall:
+        errors.append("uninstall-den.ps1 must remove run-agent-worker.ps1")
 
     env_example = (SCRIPTS / "agent-worker.env.example").read_text(encoding="utf-8")
     if "CURSOR_API_KEY" not in env_example:

@@ -90,6 +90,9 @@ function Find-AgentWorkerCli {
             return $cmd.Source
         }
     }
+    # Last resort: agent.ps1 is runnable from the PowerShell scheduled task.
+    $ps1 = Get-Command agent -ErrorAction SilentlyContinue
+    if ($ps1 -and $ps1.Source) { return $ps1.Source }
     return $null
 }
 
