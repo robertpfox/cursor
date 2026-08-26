@@ -17,7 +17,11 @@ if defined DISTRO (
   echo Using WSL distro %DISTRO%
   wsl.exe -d %DISTRO% -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.sh | bash"
 ) else (
-  wsl.exe -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.sh | bash"
+  echo No Ubuntu WSL distro found. The native Windows CLI currently crashes.
+  echo Install with:  wsl --install -d Ubuntu
+  echo Then reboot and double-click this file again.
+  pause
+  exit /b 1
 )
 set ERR=%ERRORLEVEL%
 if not "%ERR%"=="0" (

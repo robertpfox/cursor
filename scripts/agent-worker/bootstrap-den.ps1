@@ -125,25 +125,18 @@ if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
         if ($hit) { $distro = [string]$hit; break }
     }
     if (-not $distro) { $distro = $usable | Where-Object { $_ -like 'Ubuntu*' } | Select-Object -First 1 }
-    if (-not $distro) { $distro = $usable | Select-Object -First 1 }
-    $probe = if ($distro) { & wsl.exe -d $distro -e true 2>$null; $LASTEXITCODE } else { 1 }
-    if ($probe -eq 0) {
+    if ($distro) {
         Write-BootStep 'WSL is ready; using the Linux CLI (Windows agent worker currently crashes)'
-        if ($distro) { Write-BootOk "distro $distro (not docker-desktop)" }
-        if ($distro) {
-            wsl.exe -d $distro -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/scripts/agent-worker/install-den-wsl.sh -o /tmp/install-den-wsl.sh && bash /tmp/install-den-wsl.sh"
-        } else {
-            wsl.exe -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/scripts/agent-worker/install-den-wsl.sh -o /tmp/install-den-wsl.sh && bash /tmp/install-den-wsl.sh"
-        }
+        Write-BootOk "distro $distro (not docker-desktop)"
+        wsl.exe -d $distro -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/den.sh | bash"
         $wslCode = $LASTEXITCODE
         $taskName = 'CursorAgentWorker'
         $launcherDir = Join-Path $env:LOCALAPPDATA 'CursorAgentWorker'
         New-Item -ItemType Directory -Path $launcherDir -Force | Out-Null
         $cmdPath = Join-Path $launcherDir 'start-den-wsl.cmd'
-        $distroFlag = if ($distro) { "-d $distro " } else { '' }
         @(
             '@echo off',
-            "wsl.exe ${distroFlag}-e bash -lc `"exec bash `$HOME/.local/share/cursor-agent-worker/wsl-worker-loop.sh`""
+            "wsl.exe -d $distro -e bash -lc `"exec bash `$HOME/.local/share/cursor-agent-worker/wsl-worker-loop.sh`""
         ) | Set-Content -Path $cmdPath -Encoding ASCII
         $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
         if ($existing) {
@@ -158,7 +151,7 @@ if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
         Write-BootOk "scheduled task $taskName (WSL worker at logon)"
         exit $wslCode
     }
-    Write-Host '    ! WSL exists but no Ubuntu distro is running. After `wsl --install -d Ubuntu` and a reboot, re-run this.' -ForegroundColor Yellow
+    Write-Host '    ! WSL exists but no Ubuntu distro was found. After `wsl --install -d Ubuntu` and a reboot, re-run this.' -ForegroundColor Yellow
 } else {
     Write-Host '    ! WSL is not installed. The native Windows CLI currently crashes (better-sqlite3 ABI).' -ForegroundColor Yellow
     Write-Host '      Install Ubuntu WSL, reboot, then paste this one-liner again:' -ForegroundColor Yellow
@@ -167,61 +160,3 @@ if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
 
 Write-Host 'Refusing to start the broken native Windows CLI. Use Ubuntu WSL.' -ForegroundColor Yellow
 exit 1
-
-try {
-    $root = Resolve-WorkerDir -Hint $WorkerDir
-    Write-BootOk "repo $root"
-
-    Write-BootStep "Updating $Branch"
-    if (Get-Command git -ErrorAction SilentlyContinue) {
-        Push-Location $root
-        try {
-            if (Test-Path -LiteralPath (Join-Path $root '.git')) {
-                git fetch origin $Branch
-                git checkout $Branch
-                git pull --ff-only origin $Branch
-            } else {
-                Write-BootStep 'No .git directory; refreshing from GitHub zip'
-                $null = Install-FromGithubZip $root
-            }
-        } finally {
-            Pop-Location
-        }
-    } else {
-        $null = Install-FromGithubZip $root
-    }
-} catch {
-    Write-Host "    ! repo fetch failed: $($_.Exception.Message)" -ForegroundColor Yellow
-    $root = Join-Path $env:USERPROFILE 'cursor'
-    New-Item -ItemType Directory -Path $root -Force | Out-Null
-    if ((Get-Command git -ErrorAction SilentlyContinue) -and -not (Test-Path -LiteralPath (Join-Path $root '.git'))) {
-        Push-Location $root
-        try {
-            git init | Out-Null
-            git remote add origin $RepoUrl 2>$null
-        } finally {
-            Pop-Location
-        }
-    }
-    Write-BootOk "fallback worker-dir $root (git remote origin=$RepoUrl)"
-}
-
-$installer = Join-Path $root 'scripts\agent-worker\install-den.ps1'
-if (Test-Path -LiteralPath $installer) {
-    Write-BootStep 'Running install-den.ps1'
-    & $installer
-    exit $LASTEXITCODE
-}
-
-Write-BootStep 'Installer not on disk; starting the worker in the foreground'
-$install = Invoke-RestMethod -Uri 'https://cursor.com/install?win32=true'
-Invoke-Expression $install
-$machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-$env:Path = @($machinePath, $userPath, $env:Path) -join ';'
-$agent = Get-Command agent.exe -ErrorAction SilentlyContinue
-if (-not $agent) { $agent = Get-Command agent -ErrorAction SilentlyContinue }
-if (-not $agent) { throw 'Cursor agent CLI is not on PATH after install.' }
-& $agent.Source login
-& $agent.Source worker --name den-computer --worker-dir $root --idle-release-timeout 0 --management-addr 127.0.0.1:18791 --debug start --verbose
-exit $LASTEXITCODE

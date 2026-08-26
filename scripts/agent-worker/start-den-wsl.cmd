@@ -9,4 +9,6 @@ for %%D in (Ubuntu Ubuntu-24.04 Ubuntu-22.04 Ubuntu-20.04) do (
     exit /b %ERRORLEVEL%
   )
 )
-wsl.exe -e bash -lc "exec bash $HOME/.local/share/cursor-agent-worker/wsl-worker-loop.sh"
+echo No Ubuntu WSL distro found. Native Windows CLI currently crashes.
+echo Install with:  wsl --install -d Ubuntu
+exit /b 1

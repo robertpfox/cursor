@@ -97,14 +97,16 @@ def main() -> int:
         errors.append("bootstrap-den.ps1 must download a GitHub zip when git is missing")
     if 'throw "git is not on PATH' in bootstrap:
         errors.append("bootstrap-den.ps1 must not hard-fail when git is missing")
-    if "repo fetch failed" not in bootstrap:
-        errors.append("bootstrap-den.ps1 must still start a worker if GitHub clone/zip fails")
+    if "worker --name den-computer" in bootstrap:
+        errors.append("bootstrap-den.ps1 must not start the broken native Windows CLI")
+    if "den.sh" not in bootstrap:
+        errors.append("bootstrap-den.ps1 must exec den.sh inside Ubuntu WSL")
+    if "Refusing to start the broken native Windows CLI" not in bootstrap:
+        errors.append("bootstrap-den.ps1 must refuse native Windows CLI when Ubuntu WSL is missing")
     if "Trying the native Windows CLI anyway" in install:
         errors.append("install-den.ps1 must not try the broken native Windows CLI")
     if "AGENT_WORKER_ALLOW_NATIVE" not in install:
         errors.append("install-den.ps1 must refuse native start unless AGENT_WORKER_ALLOW_NATIVE is set")
-    if "Refusing to start the broken native Windows CLI" not in bootstrap:
-        errors.append("bootstrap-den.ps1 must refuse native Windows CLI when Ubuntu WSL is missing")
     if "install-den-wsl.sh" not in bootstrap and "Test-AgentWorkerWsl" not in (SCRIPTS / "install-den.ps1").read_text(
         encoding="utf-8"
     ):
