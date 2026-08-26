@@ -123,18 +123,21 @@ function Get-AgentWorkerArgumentList {
         [string]$ManagementAddr,
         [string]$ApiKey
     )
-    $args = @(
+    # --api-key is a global `agent` flag. After `worker` the CLI rejects it.
+    $args = @()
+    if ($ApiKey) {
+        $args += @('--api-key', $ApiKey)
+    }
+    $args += @(
         'worker',
         '--name', $Name,
         '--worker-dir', $WorkerDir,
         '--idle-release-timeout', '0',
         '--data-dir', $DataDir,
-        '--management-addr', $ManagementAddr
+        '--management-addr', $ManagementAddr,
+        '--debug',
+        'start'
     )
-    if ($ApiKey) {
-        $args += @('--api-key', $ApiKey)
-    }
-    $args += 'start'
     return $args
 }
 

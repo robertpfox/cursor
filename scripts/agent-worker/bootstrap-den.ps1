@@ -112,33 +112,60 @@ Write-Host ''
 Write-Host '  Den Computer My Machines bootstrap' -ForegroundColor White
 Write-Host ''
 
-$root = Resolve-WorkerDir -Hint $WorkerDir
-Write-BootOk "repo $root"
+try {
+    $root = Resolve-WorkerDir -Hint $WorkerDir
+    Write-BootOk "repo $root"
 
-Write-BootStep "Updating $Branch"
-if (Get-Command git -ErrorAction SilentlyContinue) {
-    Push-Location $root
-    try {
-        if (Test-Path -LiteralPath (Join-Path $root '.git')) {
-            git fetch origin $Branch
-            git checkout $Branch
-            git pull --ff-only origin $Branch
-        } else {
-            Write-BootStep 'No .git directory; refreshing from GitHub zip'
-            $null = Install-FromGithubZip $root
+    Write-BootStep "Updating $Branch"
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        Push-Location $root
+        try {
+            if (Test-Path -LiteralPath (Join-Path $root '.git')) {
+                git fetch origin $Branch
+                git checkout $Branch
+                git pull --ff-only origin $Branch
+            } else {
+                Write-BootStep 'No .git directory; refreshing from GitHub zip'
+                $null = Install-FromGithubZip $root
+            }
+        } finally {
+            Pop-Location
         }
-    } finally {
-        Pop-Location
+    } else {
+        $null = Install-FromGithubZip $root
     }
-} else {
-    $null = Install-FromGithubZip $root
+} catch {
+    Write-Host "    ! repo fetch failed: $($_.Exception.Message)" -ForegroundColor Yellow
+    $root = Join-Path $env:USERPROFILE 'cursor'
+    New-Item -ItemType Directory -Path $root -Force | Out-Null
+    if ((Get-Command git -ErrorAction SilentlyContinue) -and -not (Test-Path -LiteralPath (Join-Path $root '.git'))) {
+        Push-Location $root
+        try {
+            git init | Out-Null
+            git remote add origin $RepoUrl 2>$null
+        } finally {
+            Pop-Location
+        }
+    }
+    Write-BootOk "fallback worker-dir $root (git remote origin=$RepoUrl)"
 }
 
 $installer = Join-Path $root 'scripts\agent-worker\install-den.ps1'
-if (-not (Test-Path -LiteralPath $installer)) {
-    throw "Installer missing at $installer. Is branch $Branch pushed?"
+if (Test-Path -LiteralPath $installer) {
+    Write-BootStep 'Running install-den.ps1'
+    & $installer
+    exit $LASTEXITCODE
 }
 
-Write-BootStep 'Running install-den.ps1'
-& $installer
+Write-BootStep 'Installer not on disk; starting the worker in the foreground'
+$install = Invoke-RestMethod -Uri 'https://cursor.com/install?win32=true'
+Invoke-Expression $install
+$machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+$env:Path = @($machinePath, $userPath, $env:Path) -join ';'
+$agent = Get-Command agent.exe -ErrorAction SilentlyContinue
+if (-not $agent) { $agent = Get-Command agent -ErrorAction SilentlyContinue }
+if (-not $agent) { throw 'Cursor agent CLI is not on PATH after install.' }
+& $agent.Source login
+& $agent.Source worker --name den-computer --worker-dir $root --idle-release-timeout 0 --management-addr 127.0.0.1:18791 --debug start --verbose
 exit $LASTEXITCODE

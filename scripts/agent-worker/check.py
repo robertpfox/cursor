@@ -67,8 +67,6 @@ def main() -> int:
     install = (SCRIPTS / "install-den.ps1").read_text(encoding="utf-8")
     if "CursorAgentWorker" not in install:
         errors.append("install-den.ps1 missing scheduled task name CursorAgentWorker")
-    if "--idle-release-timeout" not in install:
-        errors.append("install-den.ps1 missing --idle-release-timeout")
     if re.search(r"--pool\b", install):
         errors.append("install-den.ps1 must not pass --pool (My Machines, not pool)")
     if "agent login" not in install and "'login'" not in install:
@@ -77,24 +75,37 @@ def main() -> int:
         errors.append("install-den.ps1 must fail if /healthz never answers")
     if "Den Computer worker is installed." in install:
         errors.append("install-den.ps1 must not claim success when the worker may be down")
-    if "start --verbose" not in install and "'--verbose'" not in install:
-        errors.append("install-den.ps1 launcher must start the worker with --verbose")
     if "powershell.exe" not in install:
         errors.append("install-den.ps1 scheduled task must run powershell.exe so agent.ps1 works")
     if "run-agent-worker.ps1" not in install:
         errors.append("install-den.ps1 must write run-agent-worker.ps1")
+    if "Get-AgentWorkerArgumentList" not in install:
+        errors.append("install-den.ps1 launcher must reuse Get-AgentWorkerArgumentList")
 
     bootstrap = (SCRIPTS / "bootstrap-den.ps1").read_text(encoding="utf-8")
     if "archive/refs/heads" not in bootstrap:
         errors.append("bootstrap-den.ps1 must download a GitHub zip when git is missing")
     if 'throw "git is not on PATH' in bootstrap:
         errors.append("bootstrap-den.ps1 must not hard-fail when git is missing")
+    if "repo fetch failed" not in bootstrap:
+        errors.append("bootstrap-den.ps1 must still start a worker if GitHub clone/zip fails")
 
     common = (SCRIPTS / "common.ps1").read_text(encoding="utf-8")
     if "agent.exe" not in common or r"\.ps1$" not in common:
         errors.append("common.ps1 must prefer agent.exe/agent.cmd over agent.ps1 for the scheduled task")
     if "Get-ChildItem" not in common or "Recurse" not in common:
         errors.append("common.ps1 must search %LOCALAPPDATA%\\cursor-agent recursively for agent.exe")
+    if "--idle-release-timeout" not in common:
+        errors.append("common.ps1 must pass --idle-release-timeout")
+    api_key_idx = common.find("if ($ApiKey)")
+    worker_idx = common.find("'worker'")
+    if api_key_idx < 0 or worker_idx < 0 or api_key_idx > worker_idx:
+        errors.append("common.ps1 must pass --api-key as a global flag before the worker subcommand")
+
+    key_line = start_sh.find("cmd+=(--api-key")
+    worker_line = start_sh.find("\n  worker\n")
+    if key_line < 0 or worker_line < 0 or key_line > worker_line:
+        errors.append("start.sh must pass --api-key before the worker subcommand")
     uninstall = (SCRIPTS / "uninstall-den.ps1").read_text(encoding="utf-8")
     if "run-agent-worker.ps1" not in uninstall:
         errors.append("uninstall-den.ps1 must remove run-agent-worker.ps1")

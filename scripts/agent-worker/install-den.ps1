@@ -123,20 +123,10 @@ $litAddr = ConvertTo-AgentWorkerPsLiteral $script:AgentWorkerManagementAddr
 # PowerShell can invoke agent.exe, agent.cmd, and agent.ps1. cmd.exe cannot run agent.ps1.
 `$ErrorActionPreference = 'Continue'
 Set-Location -LiteralPath $litRepo
+. (Join-Path `$PSScriptRoot 'common.ps1')
 `$env:CURSOR_WORKER_NAME = $litName
 `$env:CURSOR_DATA_DIR = $litDataDir
 `$envFile = $litEnvFile
-if (Test-Path -LiteralPath `$envFile) {
-    Get-Content -LiteralPath `$envFile | ForEach-Object {
-        `$line = `$_.Trim()
-        if (-not `$line -or `$line.StartsWith('#')) { return }
-        `$parts = `$line.Split('=', 2)
-        if (`$parts.Count -ne 2) { return }
-        `$n = `$parts[0].Trim()
-        `$v = `$parts[1].Trim().Trim('"').Trim("'")
-        if (`$n) { Set-Item -Path ("Env:" + `$n) -Value `$v }
-    }
-}
 `$agentPath = $litAgent
 `$logFile = $litLog
 `$name = $litName
@@ -144,21 +134,14 @@ if (Test-Path -LiteralPath `$envFile) {
 `$dataDir = $litDataDir
 `$addr = $litAddr
 while (`$true) {
+    if (Test-Path -LiteralPath `$envFile) { Import-AgentWorkerEnv `$envFile }
     if (-not (Test-Path -LiteralPath `$agentPath)) {
         Add-Content -LiteralPath `$logFile -Value ("[{0}] CLI missing: {1}" -f (Get-Date), `$agentPath)
         Start-Sleep -Seconds 10
         continue
     }
-    `$workerArgs = @(
-        'worker',
-        '--name', `$name,
-        '--worker-dir', `$workerDir,
-        '--idle-release-timeout', '0',
-        '--data-dir', `$dataDir,
-        '--management-addr', `$addr
-    )
-    if (`$env:CURSOR_API_KEY) { `$workerArgs += @('--api-key', `$env:CURSOR_API_KEY) }
-    `$workerArgs += @('start', '--verbose')
+    `$workerArgs = Get-AgentWorkerArgumentList -Name `$name -WorkerDir `$workerDir -DataDir `$dataDir -ManagementAddr `$addr -ApiKey `$env:CURSOR_API_KEY
+    `$workerArgs += '--verbose'
     & `$agentPath @workerArgs >> `$logFile 2>&1
     Add-Content -LiteralPath `$logFile -Value ("[{0}] worker exited {1}, restarting in 10s" -f (Get-Date), `$LASTEXITCODE)
     Start-Sleep -Seconds 10
@@ -249,11 +232,15 @@ if (-not $NoAutoStart) {
     Write-AgentWorkerOk "worker is answering $healthUrl"
 
     Write-AgentWorkerStep 'Asking Cursor whether it can see this machine'
-    $debugJson = & $agentPath @('worker', 'debug', '--json') 2>$null
+    $debugArgs = @()
+    if ($env:CURSOR_API_KEY) { $debugArgs += @('--api-key', $env:CURSOR_API_KEY) }
+    $debugArgs += @('worker', 'debug', '--json')
+    $debugJson = & $agentPath @debugArgs 2>$null
     if ($debugJson) {
         Write-Host $debugJson
     } else {
-        & $agentPath @('worker', 'debug')
+        $debugArgs[-1] = 'debug'
+        & $agentPath @debugArgs
     }
 }
 

@@ -48,18 +48,21 @@ else
   exit 1
 fi
 
-cmd=(
-  "$AGENT" worker
+cmd=( "$AGENT" )
+if [[ -n "${CURSOR_API_KEY:-}" ]]; then
+  cmd+=(--api-key "$CURSOR_API_KEY")
+fi
+cmd+=(
+  worker
   --name "$NAME"
   --worker-dir "$WORKER_DIR"
   --idle-release-timeout "$IDLE"
   --data-dir "$DATA_DIR"
   --management-addr "$MGMT"
+  --debug
+  start
+  --verbose
 )
-if [[ -n "${CURSOR_API_KEY:-}" ]]; then
-  cmd+=(--api-key "$CURSOR_API_KEY")
-fi
-cmd+=(start --verbose)
 
 redacted=("${cmd[@]}")
 if [[ -n "${CURSOR_API_KEY:-}" ]]; then
