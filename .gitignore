@@ -9,6 +9,7 @@
 .cursor/agent-worker-data/
 logs/agent-worker.log
 scripts/agent-worker/run-agent-worker.cmd
+scripts/agent-worker/run-agent-worker.ps1
 
 # Agent project build artifacts
 cursor-agents/**/node_modules/
