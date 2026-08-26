@@ -191,6 +191,8 @@ def main() -> int:
             errors.append("den.ps1 must auto-pick Ubuntu WSL and skip docker-desktop")
         if "den.sh" not in den_ps1_text:
             errors.append("den.ps1 must exec den.sh inside the chosen WSL distro")
+        if "wsl --install" not in den_ps1_text and "--install" not in den_ps1_text:
+            errors.append("den.ps1 must try wsl --install -d Ubuntu when no Ubuntu distro exists")
 
     readme = (SCRIPTS / "README.md").read_text(encoding="utf-8")
     vscode_tasks = ROOT / ".vscode" / "tasks.json"

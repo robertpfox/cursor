@@ -22,7 +22,7 @@ wsl -d Ubuntu -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpf
 
 `den.sh` only downloads the real installer to a file, then runs it. Do not pipe `install-den-wsl.sh` itself into bash. Do not rely on the default WSL distro — Docker Desktop often is.
 
-If that fails with a WSL error, install Ubuntu then reboot:
+`den.ps1` tries `wsl --install -d Ubuntu` when no Ubuntu distro exists (UAC / reboot may be required). If Windows asked for a reboot, reboot, then re-run the same one-liner. If that still fails, install Ubuntu then reboot:
 
 ```text
 wsl --install -d Ubuntu

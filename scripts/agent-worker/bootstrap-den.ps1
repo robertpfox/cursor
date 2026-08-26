@@ -151,11 +151,20 @@ if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
         Write-BootOk "scheduled task $taskName (WSL worker at logon)"
         exit $wslCode
     }
-    Write-Host '    ! WSL exists but no Ubuntu distro was found. After `wsl --install -d Ubuntu` and a reboot, re-run this.' -ForegroundColor Yellow
+    Write-Host '    ! WSL exists but no Ubuntu distro was found. Installing Ubuntu (UAC / reboot may be required).' -ForegroundColor Yellow
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    wsl.exe --install -d Ubuntu
+    $ErrorActionPreference = $prev
+    if ($LASTEXITCODE -ne 0) {
+        Start-Process -FilePath 'wsl.exe' -ArgumentList '--install','-d','Ubuntu' -Verb RunAs -Wait
+    }
+    Write-Host '      If Windows asked for a reboot, reboot, then paste this one-liner again.' -ForegroundColor Yellow
 } else {
     Write-Host '    ! WSL is not installed. The native Windows CLI currently crashes (better-sqlite3 ABI).' -ForegroundColor Yellow
-    Write-Host '      Install Ubuntu WSL, reboot, then paste this one-liner again:' -ForegroundColor Yellow
-    Write-Host '        wsl --install -d Ubuntu' -ForegroundColor Yellow
+    Write-Host '      Installing Ubuntu WSL (UAC / reboot may be required).' -ForegroundColor Yellow
+    Start-Process -FilePath "$env:SystemRoot\System32\wsl.exe" -ArgumentList '--install','-d','Ubuntu' -Verb RunAs -Wait
+    Write-Host '      If Windows asked for a reboot, reboot, then paste this one-liner again.' -ForegroundColor Yellow
 }
 
 Write-Host 'Refusing to start the broken native Windows CLI. Use Ubuntu WSL.' -ForegroundColor Yellow

@@ -23,11 +23,33 @@ function Get-UbuntuWslDistro {
     return $null
 }
 
+function Install-UbuntuWsl {
+    Write-Host 'No Ubuntu WSL distro found. The native Windows CLI currently crashes.'
+    Write-Host 'Installing Ubuntu WSL (UAC / reboot may be required). Then this script continues if Ubuntu is ready.'
+    $installArgs = @('--install', '-d', 'Ubuntu')
+    $wsl = Get-Command wsl.exe -ErrorAction SilentlyContinue
+    if (-not $wsl) {
+        Start-Process -FilePath "$env:SystemRoot\System32\wsl.exe" -ArgumentList $installArgs -Verb RunAs -Wait
+        return
+    }
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & wsl.exe @installArgs
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    if ($code -ne 0) {
+        Start-Process -FilePath 'wsl.exe' -ArgumentList $installArgs -Verb RunAs -Wait
+    }
+}
+
 $distro = Get-UbuntuWslDistro
 if (-not $distro) {
-    Write-Host 'No Ubuntu WSL distro found. The native Windows CLI currently crashes.'
-    Write-Host 'Install Ubuntu, reboot, then re-run this:'
-    Write-Host '  wsl --install -d Ubuntu'
+    Install-UbuntuWsl
+    $distro = Get-UbuntuWslDistro
+}
+if (-not $distro) {
+    Write-Host 'Ubuntu WSL is not ready yet. Reboot if Windows asked, then re-run this same one-liner.'
+    Write-Host '  powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.ps1 | iex"'
     exit 1
 }
 
