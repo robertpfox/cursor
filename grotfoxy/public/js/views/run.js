@@ -1,5 +1,5 @@
 import api from '../api.js';
-import { clockTime, duration, h, icon, money, mount, relTime } from '../dom.js';
+import { clockTime, duration, h, icon, money, mount, plural, relTime } from '../dom.js';
 import { attachDictation, avatar, statusPill, toast } from '../ui.js';
 import { navigate } from '../router.js';
 import store from '../store.js';
@@ -175,7 +175,7 @@ export async function renderRun(root, runId) {
       'div',
       { class: 'row row--tight tiny muted', style: { marginTop: '10px' } },
       h('span', { class: 'tag' }, record.model || 'no model'),
-      h('span', `${record.stepsUsed} step${record.stepsUsed === 1 ? '' : 's'}`),
+      h('span', plural(record.stepsUsed, 'step')),
       h('span', `${(record.tokensIn ?? 0) + (record.tokensOut ?? 0)} tokens`),
       h('span', money(record.costUsd)),
     ),
@@ -200,7 +200,7 @@ export async function renderRun(root, runId) {
           { class: 'card__head' },
           h('h3', 'Activity'),
           h('span', { class: 'spacer' }),
-          h('span', { class: 'tiny muted' }, `${record.steps.length} entries`),
+          h('span', { class: 'tiny muted' }, plural(record.steps.length, 'entry', 'entries')),
         ),
         timeline,
       ),

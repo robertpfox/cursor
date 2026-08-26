@@ -94,7 +94,11 @@ export async function renderDashboard(root) {
         h(
           'div',
           { class: 'row' },
-          h('h2', { style: { fontSize: '15px' } }, `${approvals.length} thing${approvals.length === 1 ? '' : 's'} need you`),
+          h(
+            'h2',
+            { style: { fontSize: '15px' } },
+            approvals.length === 1 ? '1 thing needs you' : `${approvals.length} things need you`,
+          ),
           h('span', { class: 'spacer' }),
           h('button', { class: 'btn btn--ghost btn--sm', type: 'button', onclick: () => navigate('/approvals') }, 'See all'),
         ),

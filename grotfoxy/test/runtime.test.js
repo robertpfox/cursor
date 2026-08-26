@@ -304,6 +304,69 @@ describe('sequential tool calls', () => {
     await local.close();
   });
 
+  test('pushes back when the model answers without running a deferred call', async () => {
+    const local = await startFakeModel([
+      {
+        toolCalls: [
+          { id: 'c1', name: 'get_current_time', arguments: {} },
+          { id: 'c2', name: 'read_file', arguments: { path: 'notes.md' } },
+        ],
+      },
+      // Fabricates the file contents instead of re-requesting the read.
+      { content: 'notes.md says the server is healthy.' },
+      { toolCalls: [{ id: 'c3', name: 'read_file', arguments: { path: 'notes.md' } }] },
+      { content: 'notes.md actually says: real contents.' },
+    ]);
+    const provider = createProvider({ name: 'Fake fabricate', kind: 'openai', baseUrl: local.baseUrl, apiKey: 'k' });
+    const bot = makeBot({ providerId: provider.id, name: 'Fabricator', approvalPolicy: 'never' });
+    fs.writeFileSync(path.join(botWorkspace(bot.id), 'notes.md'), 'real contents');
+
+    const started = startRun({ botId: bot.id, task: 'Read notes.md.' });
+    const finished = await waitForRun(getRun, started.id);
+
+    assert.equal(finished.status, 'succeeded');
+    assert.equal(finished.result, 'notes.md actually says: real contents.');
+
+    const nudge = loadMessages(finished.id).filter((message) => message.role === 'user').at(-1);
+    assert.match(nudge.content, /You never ran `read_file`/);
+
+    const warning = listSteps(finished.id).find((step) =>
+      step.title.includes('without running a deferred tool'),
+    );
+    assert.ok(warning, 'the push-back should be visible in the timeline');
+    await local.close();
+  });
+
+  test('pushes back only once, so a stubborn model still finishes', async () => {
+    const local = await startFakeModel([
+      {
+        toolCalls: [
+          { id: 'c1', name: 'get_current_time', arguments: {} },
+          { id: 'c2', name: 'read_file', arguments: { path: 'notes.md' } },
+        ],
+      },
+      { content: 'First guess.' },
+      { content: 'I could not check the file.' },
+    ]);
+    const provider = createProvider({ name: 'Fake stubborn', kind: 'openai', baseUrl: local.baseUrl, apiKey: 'k' });
+    const bot = makeBot({ providerId: provider.id, name: 'Stubborn', approvalPolicy: 'never' });
+
+    const started = startRun({ botId: bot.id, task: 'Read notes.md.' });
+    const finished = await waitForRun(getRun, started.id);
+
+    // Not a clean success: we know for certain the read never happened.
+    assert.equal(finished.status, 'incomplete');
+    assert.equal(finished.result, 'I could not check the file.');
+    assert.match(finished.error, /answered without ever running read_file/);
+    assert.match(finished.error, /stronger model/);
+    assert.equal(
+      listSteps(finished.id).filter((step) => step.title.includes('without running a deferred tool')).length,
+      1,
+      'a second push-back would risk an infinite loop',
+    );
+    await local.close();
+  });
+
   test('a single tool call is unaffected', async () => {
     const local = await startFakeModel([
       { toolCalls: [{ name: 'get_current_time', arguments: {} }] },

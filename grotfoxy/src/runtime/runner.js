@@ -150,6 +150,10 @@ function summarizeArgs(args) {
   return text.length > 300 ? `${text.slice(0, 300)}…` : text;
 }
 
+function plural(count, singular) {
+  return `${count} ${count === 1 ? singular : `${singular}s`}`;
+}
+
 function needsApproval(policy, sensitivity) {
   if (sensitivity === 'ask') return true;
   if (policy === 'never') return false;
@@ -198,7 +202,7 @@ async function execute(runId, signal) {
     if (connectorIssues.length) {
       addStep(runId, {
         kind: 'warning',
-        title: `${connectorIssues.length} connector(s) unavailable`,
+        title: `${plural(connectorIssues.length, 'connector')} unavailable`,
         detail: connectorIssues.map((issue) => `${issue.name}: ${issue.error}`).join('\n'),
         status: 'warning',
       });
@@ -209,12 +213,15 @@ async function execute(runId, signal) {
 
   const deadline = Date.parse(startedAt) + bot.maxSeconds * 1000;
   let stepsUsed = getRun(runId).stepsUsed;
+  /** Tool names this run asked for but had deferred, and has not since run. */
+  const deferred = new Set();
+  let nudgedAboutDeferred = false;
 
   // Finish any tool calls the previous pass left unanswered before asking the
   // model for its next move. This is what makes a paused run resumable.
   const pending = pendingToolCalls(messages);
   if (pending.length) {
-    const outcome = await runToolCalls({ runId, bot, ctx, handlers, calls: pending, signal });
+    const outcome = await runToolCalls({ runId, bot, ctx, handlers, calls: pending, signal, deferred });
     if (outcome.paused) return;
     messages = loadMessages(runId);
   }
@@ -272,11 +279,45 @@ async function execute(runId, signal) {
     messages = loadMessages(runId);
 
     if (!response.message.toolCalls?.length) {
+      // A model that never re-ran a deferred call has, at best, guessed at what
+      // it would have returned. Push back once before accepting the answer.
+      if (deferred.size && !nudgedAboutDeferred) {
+        nudgedAboutDeferred = true;
+        const outstanding = [...deferred];
+        appendMessage(runId, {
+          role: 'user',
+          content: `Stop. You never ran ${outstanding
+            .map((name) => `\`${name}\``)
+            .join(' or ')}, so you do not have ${
+            outstanding.length === 1 ? 'its result' : 'those results'
+          }. Either call ${
+            outstanding.length === 1 ? 'it' : 'them'
+          } now, or reply again and state plainly that you could not check. Do not describe anything you have not actually seen.`,
+        });
+        addStep(runId, {
+          kind: 'warning',
+          title: 'Answered without running a deferred tool',
+          detail: `Asked the model to run ${outstanding.join(', ')} or admit it did not.`,
+          status: 'warning',
+        });
+        messages = loadMessages(runId);
+        continue;
+      }
+
       const result = String(response.message.content ?? '').trim();
       recordDailyUsage({ provider: provider.name, model, countRun: true });
+
+      // Already pushed back once and the tool still never ran. We cannot prove
+      // the answer is invented, but we can prove it is not fully evidenced, so
+      // it must not land as a clean success.
+      const unverified = deferred.size > 0;
       const finished = finishRun(runId, {
-        status: 'succeeded',
+        status: unverified ? 'incomplete' : 'succeeded',
         result: result || '(the model returned an empty reply)',
+        error: unverified
+          ? `${bot.name} answered without ever running ${[...deferred]
+              .join(', ')}, so parts of this reply are not backed by a tool result. Treat it with suspicion, and consider a stronger model for this bot.`
+          : '',
       });
       touchThread(record.threadId);
       await maybeNotify(bot, finished);
@@ -299,6 +340,7 @@ async function execute(runId, signal) {
       handlers,
       calls: response.message.toolCalls,
       signal,
+      deferred,
     });
     if (outcome.paused) return;
     if (outcome.cancelled) return finishRun(runId, { status: 'cancelled', error: 'Cancelled by owner' });
@@ -330,7 +372,7 @@ function sequentialSkipNote(ranCall, skippedCall) {
   ].join(' ');
 }
 
-async function runToolCalls({ runId, bot, ctx, handlers, calls, signal }) {
+async function runToolCalls({ runId, bot, ctx, handlers, calls, signal, deferred }) {
   let queue = calls;
 
   // Answer the extras up front so the transcript stays complete even if the
@@ -343,6 +385,7 @@ async function runToolCalls({ runId, bot, ctx, handlers, calls, signal }) {
     );
     for (const skipped of calls.slice(1)) {
       if (answered.has(skipped.id)) continue;
+      deferred?.add(skipped.name);
       appendMessage(runId, {
         role: 'tool',
         toolCallId: skipped.id,
@@ -352,7 +395,7 @@ async function runToolCalls({ runId, bot, ctx, handlers, calls, signal }) {
     }
     addStep(runId, {
       kind: 'warning',
-      title: `Deferred ${calls.length - 1} parallel tool call(s)`,
+      title: `Deferred ${plural(calls.length - 1, 'parallel tool call')}`,
       detail: `Running ${calls[0].name} first. ${calls
         .slice(1)
         .map((call) => call.name)
@@ -483,6 +526,7 @@ async function runToolCalls({ runId, bot, ctx, handlers, calls, signal }) {
     const started = Date.now();
     try {
       const result = await handler.execute(call.arguments ?? {}, { ...ctx, run: getRun(runId) });
+      deferred?.delete(call.name);
       const output = String(result?.output ?? '');
       appendMessage(runId, { role: 'tool', toolCallId: call.id, name: call.name, content: output });
       addStep(runId, {

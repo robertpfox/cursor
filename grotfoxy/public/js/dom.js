@@ -88,6 +88,10 @@ const ICONS = {
   copy: '<rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h8" />',
 };
 
+export function plural(count, singular, pluralForm = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
 export function relTime(iso) {
   if (!iso) return '';
   const delta = Date.now() - Date.parse(iso);
@@ -95,16 +99,9 @@ export function relTime(iso) {
   const abs = Math.abs(delta);
   const suffix = delta >= 0 ? 'ago' : 'from now';
   if (abs < 45_000) return 'just now';
-  const units = [
-    [60_000, 'min'],
-    [3_600_000, 'hr'],
-    [86_400_000, 'day'],
-    [604_800_000, 'wk'],
-  ];
   if (abs < 3_600_000) return `${Math.round(abs / 60_000)} min ${suffix}`;
   if (abs < 86_400_000) return `${Math.round(abs / 3_600_000)} hr ${suffix}`;
-  if (abs < 604_800_000) return `${Math.round(abs / 86_400_000)} day${Math.round(abs / 86_400_000) === 1 ? '' : 's'} ${suffix}`;
-  void units;
+  if (abs < 604_800_000) return `${plural(Math.round(abs / 86_400_000), 'day')} ${suffix}`;
   return new Date(iso).toLocaleDateString();
 }
 

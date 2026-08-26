@@ -132,7 +132,8 @@ Five tabs, matching how you would brief a person:
 - **Identity** — name, icon, the job, standing context, and hard boundaries.
 - **Brain** — provider, model, temperature, and when to notify you.
 - **Tools** — which built-in tools it may use, which connectors it may reach,
-  and how eagerly it should ask permission.
+  how eagerly it should ask permission, and whether it may call several tools
+  in one turn.
 - **Limits** — max steps, max seconds and max spend per run; allowed HTTP
   hosts; allowed and blocked shell commands.
 - **Triggers** — cron schedule and the standing task to run on it.
@@ -153,6 +154,25 @@ inside the bot's own workspace folder and reject anything that escapes it.
 Shell commands pass an allow list, a deny list, and a built-in block on the
 classics (`rm -rf /`, `mkfs`, fork bombs). Web tools honour a per-bot host
 allow list.
+
+### Keeping smaller models honest
+
+Local models are the whole point of running your own box, and small ones fail
+in two specific ways that GrotFoxy handles rather than passes on to you.
+
+**They ask for two tools at once when the second depends on the first.** A bot
+that calls `get_current_time` and `write_file` in the same turn has no time to
+write yet, so it writes the literal text `[current_time]` to your disk. Tool
+calls therefore run one per turn by default; the deferred call comes back with
+a note saying what already ran and what to request next. Turn on *Allow several
+tool calls in one turn* under **Tools** for a model that handles it.
+
+**They answer as if a tool had run when it did not.** If a run reaches its final
+answer with a deferred call still outstanding, GrotFoxy pushes back once and
+tells the model to either run it or say plainly that it could not. If the model
+does neither, the run finishes as **Stopped early** rather than Done, with a
+note naming the tool that never ran. You get an amber card and an honest
+warning instead of a green tick over a guess.
 
 ### Connectors
 

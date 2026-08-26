@@ -1,5 +1,5 @@
 import api from '../api.js';
-import { h, icon, mount, relTime } from '../dom.js';
+import { h, icon, mount, plural, relTime } from '../dom.js';
 import { confirmDialog, copyToClipboard, field, modal, toast } from '../ui.js';
 
 async function providerDialog(presets, existing = null) {
@@ -226,7 +226,7 @@ export async function renderSettings(root) {
               try {
                 const result = await api.post(`/api/providers/${provider.id}/test`);
                 status.textContent = result.ok
-                  ? `Reachable — ${result.models.length} models available`
+                  ? `Reachable — ${plural(result.models.length, 'model')} available`
                   : `Failed: ${result.error}`;
                 status.style.color = result.ok ? 'var(--green)' : 'var(--red)';
               } catch (error) {
@@ -304,7 +304,7 @@ export async function renderSettings(root) {
 
   /* ---- connectors ---- */
   const connectorRows = connectors.map((connector) => {
-    const status = h('span', { class: 'tiny muted' }, connector.lastError || `${connector.tools.length} tool(s) cached`);
+    const status = h('span', { class: 'tiny muted' }, connector.lastError || `${plural(connector.tools.length, 'tool')} cached`);
     return h(
       'div',
       { class: 'list__item is-static' },
@@ -337,7 +337,7 @@ export async function renderSettings(root) {
               try {
                 const result = await api.post(`/api/connectors/${connector.id}/test`);
                 status.textContent = result.ok
-                  ? `Ready — ${result.tools.length} tools: ${result.tools.slice(0, 5).map((tool) => tool.name).join(', ')}`
+                  ? `Ready — ${plural(result.tools.length, 'tool')}: ${result.tools.slice(0, 5).map((tool) => tool.name).join(', ')}`
                   : `Failed: ${result.error}`;
                 status.style.color = result.ok ? 'var(--green)' : 'var(--red)';
               } catch (error) {

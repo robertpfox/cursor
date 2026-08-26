@@ -1,5 +1,5 @@
 import api from '../api.js';
-import { h } from '../dom.js';
+import { h, plural } from '../dom.js';
 import { field, modal, toast } from '../ui.js';
 
 const EMOJI_CHOICES = ['🧭', '🔎', '📬', '🏡', '🛠', '📊', '🦊', '🤖', '📅', '💸', '🧪', '🗂', '🛰', '🩺', '🎯'];
@@ -168,7 +168,7 @@ export async function openBotEditor(bot = null, { isNew = !bot?.id } = {}) {
     connectors.map((entry) => ({
       value: entry.id,
       label: `${entry.label}${entry.enabled ? '' : ' (off)'}`,
-      title: entry.lastError || `${entry.tools.length} tool(s)`,
+      title: entry.lastError || plural(entry.tools.length, 'tool'),
     })),
     draft.connectors,
   );
