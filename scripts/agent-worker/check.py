@@ -73,6 +73,12 @@ def main() -> int:
         errors.append("install-den.ps1 must not pass --pool (My Machines, not pool)")
     if "agent login" not in install and "'login'" not in install:
         errors.append("install-den.ps1 must run agent login when unauthenticated")
+    if "exit 1" not in install or "did not answer" not in install:
+        errors.append("install-den.ps1 must fail if /healthz never answers")
+    if "Den Computer worker is installed." in install:
+        errors.append("install-den.ps1 must not claim success when the worker may be down")
+    if "start --verbose" not in install:
+        errors.append("install-den.ps1 launcher must start the worker with --verbose")
 
     env_example = (SCRIPTS / "agent-worker.env.example").read_text(encoding="utf-8")
     if "CURSOR_API_KEY" not in env_example:

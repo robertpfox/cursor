@@ -59,6 +59,7 @@ $argList = Get-AgentWorkerArgumentList `
     -DataDir $dataDir `
     -ManagementAddr $script:AgentWorkerManagementAddr `
     -ApiKey $env:CURSOR_API_KEY
+$argList += '--verbose'
 
 $displayArgs = foreach ($item in $argList) {
     if ($env:CURSOR_API_KEY -and $item -eq $env:CURSOR_API_KEY) { '<redacted>' } else { $item }

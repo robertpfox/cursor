@@ -59,7 +59,7 @@ cmd=(
 if [[ -n "${CURSOR_API_KEY:-}" ]]; then
   cmd+=(--api-key "$CURSOR_API_KEY")
 fi
-cmd+=(start)
+cmd+=(start --verbose)
 
 redacted=("${cmd[@]}")
 if [[ -n "${CURSOR_API_KEY:-}" ]]; then

@@ -116,7 +116,7 @@ if exist "$envFile" (
   )
 )
 :loop
-"$quotedAgent" worker --name "$Name" --worker-dir "$WorkerDir" --idle-release-timeout 0 --data-dir "$dataDir" --management-addr $($script:AgentWorkerManagementAddr) start >> "$logFile" 2>&1
+"$quotedAgent" worker --name "$Name" --worker-dir "$WorkerDir" --idle-release-timeout 0 --data-dir "$dataDir" --management-addr $($script:AgentWorkerManagementAddr) start --verbose >> "$logFile" 2>&1
 echo [%date% %time%] worker exited %ERRORLEVEL%, restarting in 10s >> "$logFile"
 timeout /t 10 /nobreak > nul
 goto loop
@@ -171,8 +171,8 @@ if (-not $NoAutoStart) {
     Start-ScheduledTask -TaskName $taskName
     $ready = $false
     $healthUrl = "http://$($script:AgentWorkerManagementAddr)/healthz"
-    foreach ($attempt in 1..40) {
-        Start-Sleep -Milliseconds 500
+    foreach ($attempt in 1..60) {
+        Start-Sleep -Seconds 1
         try {
             $response = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 2
             if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
@@ -181,8 +181,26 @@ if (-not $NoAutoStart) {
             }
         } catch { }
     }
-    if ($ready) { Write-AgentWorkerOk "worker is answering $healthUrl" }
-    else { Write-AgentWorkerWarn "Not answering yet. Check $logFile" }
+    if (-not $ready) {
+        Write-Host ''
+        Write-Host "  Worker did not answer $healthUrl within 60s. It is NOT connected." -ForegroundColor Red
+        Write-Host "  Last log lines ($logFile):" -ForegroundColor Yellow
+        if (Test-Path -LiteralPath $logFile) {
+            Get-Content -LiteralPath $logFile -Tail 40
+        } else {
+            Write-Host '  (no log file yet)'
+        }
+        Write-Host ''
+        Write-Host '  Typical causes:' -ForegroundColor Yellow
+        Write-Host '    - agent login was cancelled or used a different Cursor account'
+        Write-Host '    - CURSOR_API_KEY is a team/org/service-account key (My Machines needs a personal user key)'
+        Write-Host '    - outbound HTTPS to api2.cursor.sh is blocked'
+        Write-Host ''
+        Write-Host "    Get-Content $logFile -Tail 50 -Wait"
+        Write-Host ''
+        exit 1
+    }
+    Write-AgentWorkerOk "worker is answering $healthUrl"
 
     Write-AgentWorkerStep 'Asking Cursor whether it can see this machine'
     $debugJson = & $agentPath @('worker', 'debug', '--json') 2>$null
@@ -194,11 +212,12 @@ if (-not $NoAutoStart) {
 }
 
 Write-Host ''
-Write-Host '  Den Computer worker is installed.' -ForegroundColor Green
+Write-Host "  Local worker process is up on this machine as `"$Name`"." -ForegroundColor Green
+Write-Host '  Confirm it in Cursor before considering this done:'
 Write-Host ''
 Write-Host "  1. Open https://cursor.com/agents"
-Write-Host "  2. In the environment / Run on dropdown, pick `"$Name`""
-Write-Host '  3. Send a task. Tool calls run on this machine.'
+Write-Host "  2. In the environment / Run on dropdown, pick `"$Name`" under My Machines"
+Write-Host '  3. If the name is missing, the worker is not connected — check the log above.'
 Write-Host ''
 Write-Host '  Slack / GitHub / Linear:  worker=den-computer'
 Write-Host ''
