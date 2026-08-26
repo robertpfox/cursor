@@ -40,7 +40,10 @@ function Write-BootStep($message) { Write-Host "==> $message" -ForegroundColor C
 function Write-BootOk($message) { Write-Host "    $([char]0x2713) $message" -ForegroundColor Green }
 
 function Test-CursorConfigRepo([string]$Path) {
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return $false }
+    if (Test-Path -LiteralPath (Join-Path $Path 'scripts\agent-worker\install-den.ps1')) { return $true }
     if (-not (Test-Path -LiteralPath (Join-Path $Path '.git'))) { return $false }
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) { return $false }
     Push-Location $Path
     try {
         $remote = (git remote get-url origin 2>$null)
@@ -48,6 +51,26 @@ function Test-CursorConfigRepo([string]$Path) {
     } finally {
         Pop-Location
     }
+}
+
+function Install-FromGithubZip([string]$Dest) {
+    $encoded = [uri]::EscapeDataString($Branch)
+    $zipUrl = "https://github.com/robertpfox/cursor/archive/refs/heads/$encoded.zip"
+    $zipPath = Join-Path $env:TEMP 'cursor-agent-worker.zip'
+    $extractRoot = Join-Path $env:TEMP 'cursor-agent-worker-extract'
+    Write-BootStep "Downloading $zipUrl"
+    if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
+    if (Test-Path -LiteralPath $extractRoot) { Remove-Item -LiteralPath $extractRoot -Recurse -Force }
+    Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -UseBasicParsing
+    Expand-Archive -Path $zipPath -DestinationPath $extractRoot -Force
+    $installer = Get-ChildItem -Path $extractRoot -Recurse -Filter 'install-den.ps1' |
+        Where-Object { $_.Directory.Name -eq 'agent-worker' } |
+        Select-Object -First 1
+    if (-not $installer) { throw "Zip from $zipUrl did not contain scripts\\agent-worker\\install-den.ps1" }
+    $sourceRoot = $installer.Directory.Parent.Parent.FullName
+    New-Item -ItemType Directory -Path $Dest -Force | Out-Null
+    Copy-Item -Path (Join-Path $sourceRoot '*') -Destination $Dest -Recurse -Force
+    return (Resolve-Path $Dest).Path
 }
 
 function Resolve-WorkerDir {
@@ -72,16 +95,17 @@ function Resolve-WorkerDir {
         $cloneTo = Join-Path $env:USERPROFILE 'cursor'
     }
 
-    Write-BootStep "Cloning $RepoUrl -> $cloneTo"
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        throw "git is not on PATH. Install Git for Windows, then re-run this script."
-    }
-    if (Test-Path -LiteralPath (Join-Path $cloneTo '.git')) {
+    Write-BootStep "Fetching $RepoUrl ($Branch) -> $cloneTo"
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        if (Test-Path -LiteralPath (Join-Path $cloneTo '.git')) {
+            return (Resolve-Path $cloneTo).Path
+        }
+        $parent = Split-Path $cloneTo
+        if ($parent) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+        git clone --branch $Branch --single-branch $RepoUrl $cloneTo
         return (Resolve-Path $cloneTo).Path
     }
-    New-Item -ItemType Directory -Path (Split-Path $cloneTo) -Force | Out-Null
-    git clone --branch $Branch --single-branch $RepoUrl $cloneTo
-    return (Resolve-Path $cloneTo).Path
+    return Install-FromGithubZip $cloneTo
 }
 
 Write-Host ''
@@ -92,13 +116,22 @@ $root = Resolve-WorkerDir -Hint $WorkerDir
 Write-BootOk "repo $root"
 
 Write-BootStep "Updating $Branch"
-Push-Location $root
-try {
-    git fetch origin $Branch
-    git checkout $Branch
-    git pull --ff-only origin $Branch
-} finally {
-    Pop-Location
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    Push-Location $root
+    try {
+        if (Test-Path -LiteralPath (Join-Path $root '.git')) {
+            git fetch origin $Branch
+            git checkout $Branch
+            git pull --ff-only origin $Branch
+        } else {
+            Write-BootStep 'No .git directory; refreshing from GitHub zip'
+            $null = Install-FromGithubZip $root
+        }
+    } finally {
+        Pop-Location
+    }
+} else {
+    $null = Install-FromGithubZip $root
 }
 
 $installer = Join-Path $root 'scripts\agent-worker\install-den.ps1'

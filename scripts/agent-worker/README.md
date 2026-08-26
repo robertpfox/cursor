@@ -6,7 +6,7 @@
 
 ## Windows (Den Computer)
 
-Paste this in PowerShell on the Den Computer (no checkout required). If you are not signed in, a browser window opens for `agent login`:
+Paste this in PowerShell on the Den Computer (no checkout required). Git for Windows is optional — without it the script downloads a zip of this branch. If you are not signed in, a browser window opens for `agent login`:
 
 ```powershell
 irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/bootstrap-den.ps1 | iex

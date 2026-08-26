@@ -80,6 +80,12 @@ def main() -> int:
     if "start --verbose" not in install:
         errors.append("install-den.ps1 launcher must start the worker with --verbose")
 
+    bootstrap = (SCRIPTS / "bootstrap-den.ps1").read_text(encoding="utf-8")
+    if "archive/refs/heads" not in bootstrap:
+        errors.append("bootstrap-den.ps1 must download a GitHub zip when git is missing")
+    if 'throw "git is not on PATH' in bootstrap:
+        errors.append("bootstrap-den.ps1 must not hard-fail when git is missing")
+
     env_example = (SCRIPTS / "agent-worker.env.example").read_text(encoding="utf-8")
     if "CURSOR_API_KEY" not in env_example:
         errors.append("agent-worker.env.example missing CURSOR_API_KEY")
