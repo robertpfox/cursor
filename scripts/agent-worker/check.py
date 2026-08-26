@@ -191,6 +191,8 @@ def main() -> int:
             errors.append("den.ps1 must auto-pick Ubuntu WSL and skip docker-desktop")
         if "den.sh" not in den_ps1_text:
             errors.append("den.ps1 must exec den.sh inside the chosen WSL distro")
+        if "| bash" in den_ps1_text or "|bash" in den_ps1_text:
+            errors.append("den.ps1 must not pipe den.sh into bash; download to a file so login keeps a TTY")
         if "wsl --install" not in den_ps1_text and "--install" not in den_ps1_text:
             errors.append("den.ps1 must try wsl --install -d Ubuntu when no Ubuntu distro exists")
 

@@ -70,11 +70,11 @@ if (Test-AgentWorkerWsl) {
         if ($unixInstaller) { $unixInstaller = [string]$unixInstaller.Trim() }
     }
     if ($unixInstaller) {
-        $wslCode = Invoke-AgentWorkerWsl -WslArgs @('-e', 'bash', $unixInstaller)
+        $wslCode = Invoke-AgentWorkerWsl -WslArgs @('--', 'bash', '-li', $unixInstaller)
     } else {
         $wslCode = Invoke-AgentWorkerWsl -WslArgs @(
-            '-e', 'bash', '-lc',
-            'curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh -o /tmp/install-den-wsl.sh && bash /tmp/install-den-wsl.sh'
+            '--', 'bash', '-lic',
+            'curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh -o /tmp/install-den-wsl.sh && exec bash /tmp/install-den-wsl.sh'
         )
     }
 

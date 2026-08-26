@@ -15,7 +15,7 @@ for %%D in (Ubuntu Ubuntu-24.04 Ubuntu-22.04 Ubuntu-20.04) do (
 :run
 if defined DISTRO (
   echo Using WSL distro %DISTRO%
-  wsl.exe -d %DISTRO% -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.sh | bash"
+  wsl.exe -d %DISTRO% -- bash -lic "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.sh -o /tmp/den.sh && exec bash /tmp/den.sh"
 ) else (
   echo No Ubuntu WSL distro found. The native Windows CLI currently crashes.
   echo Install with:  wsl --install -d Ubuntu

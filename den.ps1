@@ -54,5 +54,8 @@ if (-not $distro) {
 }
 
 Write-Host "Using WSL distro $distro (not docker-desktop)"
-& wsl.exe -d $distro -e bash -lc "curl -fsSL $Url | bash"
+# Do not pipe den.sh into bash. A pipe steals stdin, so agent login has no TTY
+# when this is launched from Win+R. Download, then exec in a login shell.
+$inner = "curl -fsSL '$Url' -o /tmp/den.sh && exec bash /tmp/den.sh"
+& wsl.exe -d $distro -- bash -lic $inner
 exit $LASTEXITCODE

@@ -48,11 +48,11 @@ if (-not $WorkerDir) { $WorkerDir = $repoRoot }
 Import-AgentWorkerEnv (Get-AgentWorkerEnvPath $repoRoot)
 
 if (Test-AgentWorkerWsl) {
-    $den = 'curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.sh | bash'
-    Write-Host "  wsl.exe -d $(Get-AgentWorkerWslDistro) -e bash -lc `"$den`""
+    $den = "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.sh -o /tmp/den.sh && exec bash /tmp/den.sh"
+    Write-Host "  wsl.exe -d $(Get-AgentWorkerWslDistro) -- bash -lic `"$den`""
     if ($DryRun) { exit 0 }
     Write-AgentWorkerStep 'Native Windows CLI currently crashes. Starting via Ubuntu WSL.'
-    $code = Invoke-AgentWorkerWsl -WslArgs @('-e', 'bash', '-lc', $den)
+    $code = Invoke-AgentWorkerWsl -WslArgs @('--', 'bash', '-lic', $den)
     exit $code
 }
 
