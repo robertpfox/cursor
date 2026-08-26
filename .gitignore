@@ -4,6 +4,12 @@
 .cursor/ai-tracking/
 .cursor/plugins/cache/
 
+# Den Computer My Machines worker (generated / secret)
+.cursor/agent-worker.env
+.cursor/agent-worker-data/
+logs/agent-worker.log
+scripts/agent-worker/run-agent-worker.cmd
+
 # Agent project build artifacts
 cursor-agents/**/node_modules/
 cursor-agents/**/dist/
