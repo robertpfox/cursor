@@ -34,8 +34,15 @@ fi
 echo "==> Ensuring git and curl are installed"
 if ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
-  sudo apt-get update -y
-  sudo apt-get install -y git curl ca-certificates
+  if command -v apt-get >/dev/null 2>&1; then
+    if [[ "$(id -u)" -eq 0 ]]; then
+      apt-get update -y && apt-get install -y git curl ca-certificates || true
+    elif sudo -n true 2>/dev/null; then
+      sudo -n apt-get update -y && sudo -n apt-get install -y git curl ca-certificates || true
+    else
+      echo "    ! cannot install packages without a passwordless sudo; continuing"
+    fi
+  fi
 fi
 
 echo "==> Installing the Cursor agent CLI (Linux)"
@@ -47,18 +54,42 @@ AGENT="${HOME}/.local/bin/agent"
 "$AGENT" --version || true
 
 echo "==> Checkout $REPO_URL ($BRANCH) on the WSL filesystem"
-mkdir -p "$ROOT" "$LOG_DIR" "$DATA_DIR"
+# Clone before creating logs/ under $ROOT — git clone refuses a non-empty directory.
+# Older installers mkdir'd logs first; treat a logs-only leftover as cloneable.
+clone_repo() {
+  git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$ROOT"
+}
+
 if [[ -d "$ROOT/.git" ]]; then
-  git -C "$ROOT" fetch origin "$BRANCH" || true
-  git -C "$ROOT" checkout "$BRANCH" || true
-  git -C "$ROOT" pull --ff-only origin "$BRANCH" || true
-else
-  if ! git clone --branch "$BRANCH" --single-branch "$REPO_URL" "$ROOT"; then
-    echo "    clone failed; initializing $ROOT with origin $REPO_URL"
-    git -C "$ROOT" init
-    git -C "$ROOT" remote add origin "$REPO_URL" 2>/dev/null || true
+  if command -v git >/dev/null 2>&1; then
+    git -C "$ROOT" fetch origin "$BRANCH" || true
+    git -C "$ROOT" checkout "$BRANCH" || true
+    git -C "$ROOT" pull --ff-only origin "$BRANCH" || true
   fi
+elif command -v git >/dev/null 2>&1 && [[ ! -e "$ROOT" ]]; then
+  clone_repo || true
+elif command -v git >/dev/null 2>&1 && [[ -d "$ROOT" ]]; then
+  leftover_ok=1
+  shopt -s nullglob dotglob
+  for entry in "$ROOT"/*; do
+    base="$(basename "$entry")"
+    case "$base" in
+      .|..|logs) ;;
+      *) leftover_ok=0 ;;
+    esac
+  done
+  shopt -u nullglob dotglob
+  if [[ "$leftover_ok" -eq 1 ]]; then
+    echo "    removing logs-only leftover at $ROOT so clone can proceed"
+    rm -rf "$ROOT"
+    clone_repo || true
+  else
+    echo "    leaving existing $ROOT (not a git checkout); worker start still proceeds"
+  fi
+else
+  echo "    git is not installed; starting the worker without a clone"
 fi
+mkdir -p "$LOG_DIR" "$DATA_DIR"
 
 echo "==> Authentication"
 if [[ -z "${CURSOR_API_KEY:-}" ]]; then
@@ -79,15 +110,22 @@ NAME="${CURSOR_WORKER_NAME:-den-computer}"
 IDLE="${CURSOR_WORKER_IDLE_RELEASE_TIMEOUT:-0}"
 DATA_DIR="${CURSOR_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/cursor-agent-worker}"
 MGMT="${CURSOR_WORKER_MANAGEMENT_ADDR:-127.0.0.1:18791}"
+ENV_FILE="${ROOT}/.cursor/agent-worker.env"
 LOG="${ROOT}/logs/agent-worker.log"
 mkdir -p "$(dirname "$LOG")" "$DATA_DIR"
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
 export PATH="${HOME}/.local/bin:${PATH}"
 AGENT="${HOME}/.local/bin/agent"
 cd "$ROOT" || exit 1
 while true; do
   cmd=( "$AGENT" )
   if [[ -n "${CURSOR_API_KEY:-}" ]]; then cmd+=(--api-key "$CURSOR_API_KEY"); fi
-  cmd+=( worker --name "$NAME" --worker-dir "$ROOT" --idle-release-timeout "$IDLE" --data-dir "$DATA_DIR" --management-addr "$MGMT" --debug start --verbose )
+  cmd+=( worker --name "$NAME" --worker-dir "$ROOT" --idle-release-timeout "$IDLE" --data-dir "$DATA_DIR" --management-addr "$MGMT" --wait --debug start --verbose )
   "${cmd[@]}" >>"$LOG" 2>&1
   echo "$(date -Is) worker exited $?, restarting in 10s" >>"$LOG"
   sleep 10

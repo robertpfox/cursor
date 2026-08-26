@@ -101,8 +101,18 @@ def main() -> int:
         errors.append("install-den-wsl.sh must document the Windows exec-daemon crash")
     if "/mnt/c" not in wsl_install:
         errors.append("install-den-wsl.sh must keep the worker-dir off /mnt/c")
-    if "sudo apt-get install" not in wsl_install or "git curl" not in wsl_install:
-        errors.append("install-den-wsl.sh must install git and curl on a fresh Ubuntu WSL")
+    if "sudo -n" not in wsl_install:
+        errors.append("install-den-wsl.sh must not hang on a sudo password prompt")
+    if "git curl ca-certificates" not in wsl_install:
+        errors.append("install-den-wsl.sh must still try to install git and curl")
+    if "git clone" in wsl_install and 'mkdir -p "$ROOT" "$LOG_DIR"' in wsl_install:
+        errors.append("install-den-wsl.sh must not mkdir logs under ROOT before git clone")
+    if "git init" in wsl_install:
+        errors.append("install-den-wsl.sh must not git-init a leftover ROOT; clone after removing logs-only leftovers")
+    if "logs-only leftover" not in wsl_install:
+        errors.append("install-den-wsl.sh must recover from a logs-only leftover ROOT")
+    if "--wait --debug start --verbose" not in wsl_install:
+        errors.append("install-den-wsl.sh fallback loop must pass --wait before start")
 
     common = (SCRIPTS / "common.ps1").read_text(encoding="utf-8")
     if "agent.exe" not in common or r"\.ps1$" not in common:
