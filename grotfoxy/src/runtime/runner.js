@@ -213,9 +213,12 @@ async function execute(runId, signal) {
 
   const deadline = Date.parse(startedAt) + bot.maxSeconds * 1000;
   let stepsUsed = getRun(runId).stepsUsed;
-  /** Tool names this run asked for but had deferred, and has not since run. */
-  const deferred = new Set();
-  let nudgedAboutDeferred = false;
+  // Rebuilt from the transcript so a run that paused for approval and resumed
+  // still remembers what it skipped and whether it was already pushed back.
+  const deferred = outstandingDeferrals(messages);
+  let nudgedAboutDeferred = messages.some(
+    (message) => message.role === 'user' && message.content?.startsWith(NUDGE_MARKER),
+  );
 
   // Finish any tool calls the previous pass left unanswered before asking the
   // model for its next move. This is what makes a paused run resumable.
@@ -287,7 +290,7 @@ async function execute(runId, signal) {
         appendMessage(runId, {
           role: 'user',
           content: [
-            `Stop. You have not run ${outstanding.map((name) => `\`${name}\``).join(' or ')} yet, so you do not have ${
+            `${NUDGE_MARKER} ${outstanding.map((name) => `\`${name}\``).join(' or ')} yet, so you do not have ${
               outstanding.length === 1 ? 'its result' : 'those results'
             }.`,
             `Call ${outstanding.length === 1 ? 'it' : 'them'} now.`,
@@ -316,7 +319,9 @@ async function execute(runId, signal) {
         title: unrun.length ? 'Finished without running every tool' : undefined,
         result: result || '(the model returned an empty reply)',
         error: unrun.length
-          ? `${unrun.join(', ')} was requested but never ran, so anything above that depends on it is not backed by a tool result. If this keeps happening, give ${bot.name} a stronger model.`
+          ? `${unrun.join(', ')} ${unrun.length === 1 ? 'was' : 'were'} requested but never ran, so anything above that depends on ${
+              unrun.length === 1 ? 'it' : 'them'
+            } is not backed by a tool result. If this keeps happening, give ${bot.name} a stronger model.`
           : '',
       });
       touchThread(record.threadId);
@@ -358,6 +363,11 @@ function pendingToolCalls(messages) {
   return lastAssistant.toolCalls.filter((call) => !answered.has(call.id));
 }
 
+// Markers let a resumed run rebuild what it deferred and whether it already
+// pushed back, by reading the transcript rather than in-memory state.
+const SKIP_MARKER = 'Not run yet. This teammate executes one tool per turn';
+const NUDGE_MARKER = 'Stop. You have not run';
+
 /**
  * Names what just ran, so the model does not simply repeat the whole batch on
  * its next turn. Without the "do not call it again" clause, small models loop:
@@ -366,10 +376,21 @@ function pendingToolCalls(messages) {
  */
 function sequentialSkipNote(ranCall, skippedCall) {
   return [
-    `Not run yet. This teammate executes one tool per turn so each call can use the previous result.`,
+    `${SKIP_MARKER} so each call can use the previous result.`,
     `\`${ranCall.name}\` has already run and its result is in this conversation — do not call it again.`,
     `Your next turn should call \`${skippedCall.name}\` on its own, filling its arguments with the real values from that result rather than any placeholder.`,
   ].join(' ');
+}
+
+/** Tools this run deferred and has not run since, replayed from the transcript. */
+function outstandingDeferrals(messages) {
+  const deferred = new Set();
+  for (const message of messages) {
+    if (message.role !== 'tool' || !message.name) continue;
+    if (message.content?.startsWith(SKIP_MARKER)) deferred.add(message.name);
+    else deferred.delete(message.name);
+  }
+  return deferred;
 }
 
 async function runToolCalls({ runId, bot, ctx, handlers, calls, signal, deferred }) {

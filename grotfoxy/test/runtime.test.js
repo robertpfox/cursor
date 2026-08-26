@@ -372,6 +372,36 @@ describe('sequential tool calls', () => {
     await local.close();
   });
 
+  test('remembers a deferred call across an approval pause', async () => {
+    const local = await startFakeModel([
+      {
+        toolCalls: [
+          { id: 'c1', name: 'write_file', arguments: { path: 'first.txt', content: 'a' } },
+          { id: 'c2', name: 'read_file', arguments: { path: 'first.txt' } },
+        ],
+      },
+      { content: 'Both done.' },
+      { content: 'I could not read it.' },
+    ]);
+    const provider = createProvider({ name: 'Fake resume defer', kind: 'openai', baseUrl: local.baseUrl, apiKey: 'k' });
+    const bot = makeBot({ providerId: provider.id, name: 'Resumer', approvalPolicy: 'sensitive' });
+
+    const started = startRun({ botId: bot.id, task: 'Write then read.' });
+    const paused = await waitForRun(getRun, started.id);
+    assert.equal(paused.status, 'awaiting_approval');
+
+    const pending = listPending().filter((entry) => entry.runId === started.id);
+    decideApproval(pending[0].id, 'approved', {});
+    // A fresh execute() pass: the deferral must be recovered from the
+    // transcript, not from state that died with the previous pass.
+    resumeRun(started.id);
+
+    const finished = await waitForRun(getRun, started.id);
+    assert.equal(finished.status, 'incomplete');
+    assert.match(finished.error, /read_file was requested but never ran/);
+    await local.close();
+  });
+
   test('a single tool call is unaffected', async () => {
     const local = await startFakeModel([
       { toolCalls: [{ name: 'get_current_time', arguments: {} }] },
