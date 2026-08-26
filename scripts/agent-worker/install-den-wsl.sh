@@ -11,6 +11,7 @@ set -euo pipefail
 
 BRANCH="${CURSOR_WORKER_BRANCH:-cursor/agent-worker-start-4281}"
 REPO_URL="${CURSOR_WORKER_REPO:-https://github.com/robertpfox/cursor.git}"
+INSTALLER_URL="https://raw.githubusercontent.com/robertpfox/cursor/${BRANCH}/scripts/agent-worker/install-den-wsl.sh"
 NAME="${CURSOR_WORKER_NAME:-den-computer}"
 ROOT="${HOME}/cursor"
 LOG_DIR="${ROOT}/logs"
@@ -37,7 +38,6 @@ if [[ "${AGENT_WORKER_DISTRO_HOP:-}" != "1" ]]; then
   case "${WSL_DISTRO_NAME:-}" in
     docker-desktop|docker-desktop-data|podman-machine*|rancher-desktop*)
       wsl_exe="/mnt/c/Windows/System32/wsl.exe"
-      installer_url="https://raw.githubusercontent.com/robertpfox/cursor/${BRANCH}/scripts/agent-worker/install-den-wsl.sh"
       if [[ -x "$wsl_exe" ]]; then
         names="$("$wsl_exe" -l -q 2>/dev/null | tr -d '\0\r' || true)"
         for d in Ubuntu Ubuntu-24.04 Ubuntu-22.04 Ubuntu-20.04; do
@@ -47,7 +47,7 @@ if [[ "${AGENT_WORKER_DISTRO_HOP:-}" != "1" ]]; then
           done <<< "$names"
           if [[ -n "$hop" ]]; then
             echo "==> ${WSL_DISTRO_NAME} cannot host the worker. Re-running in $hop"
-            exec env AGENT_WORKER_DISTRO_HOP=1 "$wsl_exe" -d "$hop" -e bash -lc "curl -fsSL $installer_url | bash"
+            exec env AGENT_WORKER_DISTRO_HOP=1 "$wsl_exe" -d "$hop" -e bash -lc "curl -fsSL $INSTALLER_URL -o /tmp/install-den-wsl.sh && exec bash /tmp/install-den-wsl.sh"
           fi
         done
         echo "No Ubuntu WSL distro found. Install with: wsl --install -d Ubuntu" >&2
@@ -68,6 +68,21 @@ if ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
     else
       echo "    ! cannot install packages without a passwordless sudo; continuing"
     fi
+  fi
+fi
+
+# curl|bash puts the script on stdin. `agent login` would then eat the rest of
+# this installer. Re-exec from a file with the keyboard as stdin.
+if [[ "${AGENT_WORKER_SELF_FILE:-}" != "1" && ! -t 0 ]]; then
+  if command -v curl >/dev/null 2>&1; then
+    tmp="${TMPDIR:-/tmp}/install-den-wsl.sh"
+    echo "==> Saving installer to $tmp so login can use the keyboard (not the pipe)"
+    curl -fsSL "$INSTALLER_URL" -o "$tmp"
+    chmod +x "$tmp"
+    if [[ -e /dev/tty ]]; then
+      exec env AGENT_WORKER_SELF_FILE=1 AGENT_WORKER_DISTRO_HOP="${AGENT_WORKER_DISTRO_HOP:-1}" bash "$tmp" </dev/tty
+    fi
+    exec env AGENT_WORKER_SELF_FILE=1 AGENT_WORKER_DISTRO_HOP="${AGENT_WORKER_DISTRO_HOP:-1}" bash "$tmp"
   fi
 fi
 
@@ -133,7 +148,11 @@ fi
 if [[ -z "${CURSOR_API_KEY:-}" ]]; then
   if ! "$AGENT" status --format json 2>/dev/null | grep -q '"isAuthenticated": true'; then
     echo "    Opening agent login in the Windows browser (WSL has no GUI)..."
-    "$AGENT" login
+    if [[ -e /dev/tty ]]; then
+      "$AGENT" login </dev/tty
+    else
+      "$AGENT" login
+    fi
   fi
 fi
 

@@ -15,9 +15,9 @@ for %%D in (Ubuntu Ubuntu-24.04 Ubuntu-22.04 Ubuntu-20.04) do (
 :run
 if defined DISTRO (
   echo Using WSL distro %DISTRO%
-  wsl.exe -d %DISTRO% -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh | bash"
+  wsl.exe -d %DISTRO% -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh -o /tmp/install-den-wsl.sh && bash /tmp/install-den-wsl.sh"
 ) else (
-  wsl.exe -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh | bash"
+  wsl.exe -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh -o /tmp/install-den-wsl.sh && bash /tmp/install-den-wsl.sh"
 )
 set ERR=%ERRORLEVEL%
 if not "%ERR%"=="0" (

@@ -74,7 +74,7 @@ if (Test-AgentWorkerWsl) {
     } else {
         $wslCode = Invoke-AgentWorkerWsl -WslArgs @(
             '-e', 'bash', '-lc',
-            'curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh | bash'
+            'curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh -o /tmp/install-den-wsl.sh && bash /tmp/install-den-wsl.sh'
         )
     }
 

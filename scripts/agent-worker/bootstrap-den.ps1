@@ -131,9 +131,9 @@ if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
         Write-BootStep 'WSL is ready; using the Linux CLI (Windows agent worker currently crashes)'
         if ($distro) { Write-BootOk "distro $distro (not docker-desktop)" }
         if ($distro) {
-            wsl.exe -d $distro -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/scripts/agent-worker/install-den-wsl.sh | bash"
+            wsl.exe -d $distro -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/scripts/agent-worker/install-den-wsl.sh -o /tmp/install-den-wsl.sh && bash /tmp/install-den-wsl.sh"
         } else {
-            wsl.exe -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/scripts/agent-worker/install-den-wsl.sh | bash"
+            wsl.exe -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/scripts/agent-worker/install-den-wsl.sh -o /tmp/install-den-wsl.sh && bash /tmp/install-den-wsl.sh"
         }
         $wslCode = $LASTEXITCODE
         $taskName = 'CursorAgentWorker'
