@@ -118,9 +118,21 @@ fi
 mkdir -p "$LOG_DIR" "$DATA_DIR"
 
 echo "==> Authentication"
+if [[ -x /mnt/c/Windows/System32/cmd.exe ]]; then
+  mkdir -p "${HOME}/.local/bin"
+  cat >"${HOME}/.local/bin/open-windows-browser" <<'EOF'
+#!/bin/sh
+url="$1"
+[ -n "$url" ] || exit 0
+exec /mnt/c/Windows/System32/cmd.exe /c start "" "$url"
+EOF
+  chmod +x "${HOME}/.local/bin/open-windows-browser"
+  export BROWSER="${HOME}/.local/bin/open-windows-browser"
+  unset NO_OPEN_BROWSER || true
+fi
 if [[ -z "${CURSOR_API_KEY:-}" ]]; then
   if ! "$AGENT" status --format json 2>/dev/null | grep -q '"isAuthenticated": true'; then
-    echo "    Opening agent login in the browser..."
+    echo "    Opening agent login in the Windows browser (WSL has no GUI)..."
     "$AGENT" login
   fi
 fi

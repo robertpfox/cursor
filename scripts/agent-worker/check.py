@@ -122,6 +122,8 @@ def main() -> int:
         errors.append("install-den-wsl.sh must persist the restart loop outside /tmp")
     if "docker-desktop" not in wsl_install or "AGENT_WORKER_DISTRO_HOP" not in wsl_install:
         errors.append("install-den-wsl.sh must hop out of docker-desktop into Ubuntu")
+    if "open-windows-browser" not in wsl_install or "BROWSER=" not in wsl_install:
+        errors.append("install-den-wsl.sh must open agent login in the Windows browser from WSL")
 
     common = (SCRIPTS / "common.ps1").read_text(encoding="utf-8")
     if "Get-AgentWorkerWslDistro" not in common or "docker-desktop" not in common:
