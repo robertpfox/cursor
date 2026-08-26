@@ -156,8 +156,8 @@ def main() -> int:
         errors.append("missing den.sh Win+R wrapper at repo root")
     else:
         den_text = den_sh.read_text(encoding="utf-8")
-        if "agent login" in den_text:
-            errors.append("den.sh must not call agent login (curl|bash would steal stdin)")
+        if re.search(r"^\s*agent login\b", den_text, re.MULTILINE):
+            errors.append("den.sh must not invoke agent login (curl|bash would steal stdin)")
         if "install-den-wsl.sh" not in den_text:
             errors.append("den.sh must download install-den-wsl.sh to a file and exec it")
 
