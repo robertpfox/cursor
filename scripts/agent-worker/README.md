@@ -8,19 +8,19 @@
 
 ## Windows (Den Computer)
 
-From Run (Win+R) on the Den Computer:
+Native Windows `agent worker start` currently crashes. If Ubuntu WSL is already installed, Win+R this (opens `agent login` in the browser):
 
 ```text
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/bootstrap-den.ps1 | iex"
+wsl -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh | bash"
 ```
 
-Or paste this in PowerShell (no checkout required). Git for Windows is optional — without it the script downloads a zip of this branch. If WSL (Ubuntu) is installed, bootstrap uses that and never runs the broken Windows CLI. If WSL is missing, install it first:
+If that fails with a WSL error, install Ubuntu then reboot:
 
 ```text
 wsl --install -d Ubuntu
 ```
 
-Reboot if Windows asks, then paste the one-liner again. Finish `agent login` as robertpfox@gmail.com (personal user key, not team/org/service-account).
+PowerShell one-liner (detects WSL, otherwise falls back):
 
 ```powershell
 irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/bootstrap-den.ps1 | iex

@@ -124,7 +124,9 @@ def main() -> int:
     if "run-agent-worker.ps1" not in uninstall:
         errors.append("uninstall-den.ps1 must remove run-agent-worker.ps1")
 
-    env_example = (SCRIPTS / "agent-worker.env.example").read_text(encoding="utf-8")
+    readme = (SCRIPTS / "README.md").read_text(encoding="utf-8")
+    if "install-den-wsl.sh" not in readme or "wsl -e bash" not in readme:
+        errors.append("README must lead with the WSL curl|bash one-liner")
     if "CURSOR_API_KEY" not in env_example:
         errors.append("agent-worker.env.example missing CURSOR_API_KEY")
 
