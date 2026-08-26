@@ -14,6 +14,8 @@ REQUIRED = [
     "start.ps1",
     "install-den.ps1",
     "uninstall-den.ps1",
+    "bootstrap-den.ps1",
+    "start-den-worker.cmd",
     "start.sh",
     "README.md",
     "agent-worker.env.example",

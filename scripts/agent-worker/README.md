@@ -6,15 +6,24 @@
 
 ## Windows (Den Computer)
 
-```powershell
-cd <this-repo>
-# once:
-agent login
-# or put a *personal* user API key (https://cursor.com/dashboard/api) in
-# .cursor\agent-worker.env as CURSOR_API_KEY=key_...
+Paste this in an elevated PowerShell on the Den Computer (no checkout required):
 
+```powershell
+agent login
+irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/bootstrap-den.ps1 | iex
+```
+
+From an existing clone of this repo:
+
+```powershell
+git fetch origin cursor/agent-worker-start-4281
+git checkout cursor/agent-worker-start-4281
 powershell -ExecutionPolicy Bypass -File .\scripts\agent-worker\install-den.ps1
 ```
+
+Or double-click `scripts\agent-worker\start-den-worker.cmd`.
+
+`agent login` is once per Windows user. For boot-without-sign-in, put a *personal* user API key (https://cursor.com/dashboard/api) in `.cursor\agent-worker.env` as `CURSOR_API_KEY=key_...`.
 
 The installer registers a Scheduled Task named `CursorAgentWorker`. As Administrator with an API key it starts at boot as SYSTEM; otherwise it starts at logon as you.
 
