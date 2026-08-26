@@ -6,7 +6,7 @@
       "type": "shell",
       "command": "echo Refusing to start a My Machines worker here. Run this task on the Den Computer (Windows + WSL).",
       "windows": {
-        "command": "wsl -d Ubuntu -e bash -lc \"curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.sh | bash\""
+        "command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.ps1 | iex\""
       },
       "problemMatcher": [],
       "presentation": {

@@ -161,6 +161,21 @@ def main() -> int:
         if "install-den-wsl.sh" not in den_text:
             errors.append("den.sh must download install-den-wsl.sh to a file and exec it")
 
+    den_ps1 = ROOT / "den.ps1"
+    if not den_ps1.is_file():
+        errors.append("missing den.ps1 Win+R wrapper at repo root")
+    else:
+        den_ps1_text = den_ps1.read_text(encoding="utf-8")
+        errors.extend(check_powershell(den_ps1))
+        if re.search(r"^\s*agent login\b", den_ps1_text, re.MULTILINE):
+            errors.append("den.ps1 must not invoke agent login")
+        if re.search(r"\bagent(\.exe|\.cmd)?\s+worker\b", den_ps1_text):
+            errors.append("den.ps1 must not start the broken native Windows CLI")
+        if "docker-desktop" not in den_ps1_text or "Ubuntu-24.04" not in den_ps1_text:
+            errors.append("den.ps1 must auto-pick Ubuntu WSL and skip docker-desktop")
+        if "den.sh" not in den_ps1_text:
+            errors.append("den.ps1 must exec den.sh inside the chosen WSL distro")
+
     readme = (SCRIPTS / "README.md").read_text(encoding="utf-8")
     vscode_tasks = ROOT / ".vscode" / "tasks.json"
     if not vscode_tasks.is_file() or "Start den-computer My Machines worker" not in vscode_tasks.read_text(
@@ -168,7 +183,9 @@ def main() -> int:
     ):
         errors.append("Missing VS Code task to start the Den Computer WSL worker")
     if "den.sh" not in readme or "wsl -d Ubuntu" not in readme:
-        errors.append("README must lead with the short den.sh Win+R one-liner targeting Ubuntu")
+        errors.append("README must include the short den.sh Win+R one-liner targeting Ubuntu")
+    if "den.ps1" not in readme:
+        errors.append("README must lead with the den.ps1 Win+R one-liner that auto-picks Ubuntu")
     if "Start-DenComputer-Worker.cmd" not in readme:
         errors.append("README must mention the double-click WSL launcher")
 

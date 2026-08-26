@@ -8,15 +8,19 @@
 
 ## Windows (Den Computer)
 
-Native Windows `agent worker start` currently crashes. If Ubuntu WSL is already installed, Win+R this (opens `agent login` in the browser):
+Native Windows `agent worker start` currently crashes. Win+R this PowerShell line — it picks Ubuntu / Ubuntu-24.04 / Ubuntu-22.04 and skips docker-desktop:
+
+```text
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.ps1 | iex"
+```
+
+If you already know the distro is named `Ubuntu`:
 
 ```text
 wsl -d Ubuntu -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.sh | bash"
 ```
 
-That wrapper only downloads the real installer to a file, then runs it. Do not pipe `install-den-wsl.sh` itself into bash.
-
-Use `-d Ubuntu-22.04` or `-d Ubuntu-24.04` if that is the distro name (`wsl -l -q`). Do not rely on the default distro — Docker Desktop often is.
+`den.sh` only downloads the real installer to a file, then runs it. Do not pipe `install-den-wsl.sh` itself into bash. Do not rely on the default WSL distro — Docker Desktop often is.
 
 If that fails with a WSL error, install Ubuntu then reboot:
 
