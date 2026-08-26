@@ -109,19 +109,19 @@ function drain() {
   }
 }
 
-function finishRun(runId, { status, result = '', error = '' }) {
+const DEFAULT_FINISH_TITLES = {
+  succeeded: 'Finished',
+  cancelled: 'Cancelled',
+  incomplete: 'Stopped early',
+  failed: 'Failed',
+};
+
+function finishRun(runId, { status, result = '', error = '', title }) {
   const record = updateRun(runId, { status, result, error, finishedAt: new Date().toISOString() });
   cancelPendingForRun(runId);
   addStep(runId, {
     kind: status === 'succeeded' ? 'result' : 'status',
-    title:
-      status === 'succeeded'
-        ? 'Finished'
-        : status === 'cancelled'
-          ? 'Cancelled'
-          : status === 'incomplete'
-            ? 'Stopped at a limit'
-            : 'Failed',
+    title: title ?? DEFAULT_FINISH_TITLES[status] ?? 'Finished',
     detail: result || error,
     status,
   });
@@ -286,13 +286,13 @@ async function execute(runId, signal) {
         const outstanding = [...deferred];
         appendMessage(runId, {
           role: 'user',
-          content: `Stop. You never ran ${outstanding
-            .map((name) => `\`${name}\``)
-            .join(' or ')}, so you do not have ${
-            outstanding.length === 1 ? 'its result' : 'those results'
-          }. Either call ${
-            outstanding.length === 1 ? 'it' : 'them'
-          } now, or reply again and state plainly that you could not check. Do not describe anything you have not actually seen.`,
+          content: [
+            `Stop. You have not run ${outstanding.map((name) => `\`${name}\``).join(' or ')} yet, so you do not have ${
+              outstanding.length === 1 ? 'its result' : 'those results'
+            }.`,
+            `Call ${outstanding.length === 1 ? 'it' : 'them'} now.`,
+            'Only if the tool genuinely will not work for you, answer again and say plainly that you could not check. Never describe content you have not actually seen.',
+          ].join(' '),
         });
         addStep(runId, {
           kind: 'warning',
@@ -310,13 +310,13 @@ async function execute(runId, signal) {
       // Already pushed back once and the tool still never ran. We cannot prove
       // the answer is invented, but we can prove it is not fully evidenced, so
       // it must not land as a clean success.
-      const unverified = deferred.size > 0;
+      const unrun = [...deferred];
       const finished = finishRun(runId, {
-        status: unverified ? 'incomplete' : 'succeeded',
+        status: unrun.length ? 'incomplete' : 'succeeded',
+        title: unrun.length ? 'Finished without running every tool' : undefined,
         result: result || '(the model returned an empty reply)',
-        error: unverified
-          ? `${bot.name} answered without ever running ${[...deferred]
-              .join(', ')}, so parts of this reply are not backed by a tool result. Treat it with suspicion, and consider a stronger model for this bot.`
+        error: unrun.length
+          ? `${unrun.join(', ')} was requested but never ran, so anything above that depends on it is not backed by a tool result. If this keeps happening, give ${bot.name} a stronger model.`
           : '',
       });
       touchThread(record.threadId);

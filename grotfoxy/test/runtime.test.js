@@ -328,7 +328,8 @@ describe('sequential tool calls', () => {
     assert.equal(finished.result, 'notes.md actually says: real contents.');
 
     const nudge = loadMessages(finished.id).filter((message) => message.role === 'user').at(-1);
-    assert.match(nudge.content, /You never ran `read_file`/);
+    assert.match(nudge.content, /have not run `read_file` yet/);
+    assert.match(nudge.content, /Call it now/, 'the push-back should lead with the action');
 
     const warning = listSteps(finished.id).find((step) =>
       step.title.includes('without running a deferred tool'),
@@ -357,8 +358,12 @@ describe('sequential tool calls', () => {
     // Not a clean success: we know for certain the read never happened.
     assert.equal(finished.status, 'incomplete');
     assert.equal(finished.result, 'I could not check the file.');
-    assert.match(finished.error, /answered without ever running read_file/);
+    assert.match(finished.error, /read_file was requested but never ran/);
     assert.match(finished.error, /stronger model/);
+    assert.ok(
+      listSteps(finished.id).some((step) => step.title === 'Finished without running every tool'),
+      'the timeline must not claim a budget limit was hit',
+    );
     assert.equal(
       listSteps(finished.id).filter((step) => step.title.includes('without running a deferred tool')).length,
       1,
