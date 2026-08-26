@@ -1,5 +1,6 @@
 import api from '../api.js';
 import { h, mount } from '../dom.js';
+import { field } from '../ui.js';
 
 /** Login and first-run setup share one screen; only the copy and endpoint differ. */
 export function renderAuth(root, { needsSetup, setupAllowed, onSuccess }) {
@@ -50,9 +51,9 @@ export function renderAuth(root, { needsSetup, setupAllowed, onSuccess }) {
         }
       },
     },
-    h('label', { class: 'field' }, h('label', { for: 'username' }, 'Username'), username),
-    setup ? h('label', { class: 'field' }, h('label', { for: 'displayName' }, 'Your name'), displayName) : null,
-    h('label', { class: 'field' }, h('label', { for: 'password' }, 'Password'), password),
+    field('Username', username),
+    setup ? field('Your name', displayName) : null,
+    field('Password', password),
     error,
     submit,
   );

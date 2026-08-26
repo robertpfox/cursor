@@ -208,7 +208,12 @@ export async function openBotEditor(bot = null, { isNew = !bot?.id } = {}) {
       ),
     ),
   );
-  const scheduleCron = h('input', { type: 'text', value: draft.scheduleCron, placeholder: '0 7 * * *' });
+  const scheduleCron = h('input', {
+    type: 'text',
+    value: draft.scheduleCron,
+    placeholder: '0 7 * * *',
+    'aria-label': 'Custom cron expression',
+  });
   const schedulePreview = h('p', { class: 'hint' });
   const customWrap = h('div', { class: 'stack stack--sm' }, scheduleCron, schedulePreview);
   customWrap.hidden = !(draft.scheduleCron && !isPreset);

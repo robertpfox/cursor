@@ -18,6 +18,7 @@ export function approvalCard(approval, onDecided) {
   const note = h('input', {
     type: 'text',
     placeholder: isQuestion ? 'Type your answer…' : 'Optional note for the bot',
+    'aria-label': isQuestion ? 'Your answer' : 'Note for the bot',
   });
 
   const decide = async (decision) => {

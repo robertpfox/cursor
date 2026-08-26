@@ -21,6 +21,7 @@ export async function renderBot(root, botId) {
   const task = h('textarea', {
     placeholder: `Give ${bot.name} something to do. Describe the outcome you want, not the steps.`,
     rows: 3,
+    'aria-label': `Task for ${bot.name}`,
   });
   const micBtn = h('button', { class: 'iconbtn mic', type: 'button', 'aria-label': 'Dictate' }, icon('mic'));
   attachDictation(micBtn, task);

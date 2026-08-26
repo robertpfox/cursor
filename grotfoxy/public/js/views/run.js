@@ -106,6 +106,7 @@ export async function renderRun(root, runId) {
   const followUp = h('textarea', {
     placeholder: `Reply to ${record.bot?.name ?? 'this teammate'} — it keeps the whole conversation.`,
     rows: 2,
+    'aria-label': 'Follow-up message',
   });
   const micBtn = h('button', { class: 'iconbtn mic', type: 'button', 'aria-label': 'Dictate' }, icon('mic'));
   attachDictation(micBtn, followUp);

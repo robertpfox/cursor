@@ -123,8 +123,32 @@ export function confirmDialog({ title, message, confirmLabel = 'Confirm', danger
   }).then((value) => value === true);
 }
 
+let fieldSeq = 0;
+
+/**
+ * Label + control + optional hint. The wrapper is a div, not a label: nesting a
+ * `<label>` inside a `<label>` is invalid HTML and leaves the control with no
+ * accessible name, which also stops browser autofill from working.
+ */
+const LABELABLE = new Set(['INPUT', 'SELECT', 'TEXTAREA']);
+
 export function field(label, control, hint) {
-  return h('label', { class: 'field' }, h('label', label), control, hint ? h('span', { class: 'hint' }, hint) : null);
+  const id = control.id || `f${(fieldSeq += 1)}`;
+  control.id = id;
+
+  const hintNode = hint ? h('span', { class: 'hint', id: `${id}-hint` }, hint) : null;
+  if (hintNode) control.setAttribute('aria-describedby', hintNode.id);
+
+  // `for` is only valid against a real form control. Groups of chips get a
+  // plain caption and an aria-label instead.
+  if (!LABELABLE.has(control.tagName)) {
+    control.setAttribute('role', control.getAttribute('role') ?? 'group');
+    control.setAttribute('aria-label', label);
+    return h('div', { class: 'field' }, h('span', { class: 'field__caption' }, label), control, hintNode);
+  }
+
+  if (!control.name) control.name = id;
+  return h('div', { class: 'field' }, h('label', { for: id }, label), control, hintNode);
 }
 
 export function empty(title, message, action) {
