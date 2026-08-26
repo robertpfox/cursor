@@ -140,6 +140,8 @@ def main() -> int:
         errors.append("install-den-wsl.sh must open agent login in the Windows browser from WSL")
     if "AGENT_WORKER_SELF_FILE" not in wsl_install or "/dev/tty" not in wsl_install:
         errors.append("install-den-wsl.sh must re-exec from a file so curl|bash cannot steal stdin from agent login")
+    if "seq 1 180" not in wsl_install:
+        errors.append("install-den-wsl.sh must wait up to 180s for /healthz on first start")
 
     common = (SCRIPTS / "common.ps1").read_text(encoding="utf-8")
     if "Get-AgentWorkerWslDistro" not in common or "docker-desktop" not in common:

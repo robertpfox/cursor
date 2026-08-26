@@ -244,7 +244,7 @@ echo $! >"$pid_file"
 register_windows_logon_task
 
 ready=0
-for _ in $(seq 1 60); do
+for _ in $(seq 1 180); do
   if curl -sf --max-time 2 "http://${MGMT}/healthz" >/dev/null; then
     ready=1
     break
@@ -254,7 +254,8 @@ done
 
 if [[ "$ready" -ne 1 ]]; then
   echo
-  echo "  Worker did not answer http://${MGMT}/healthz within 60s. It is NOT connected." >&2
+  echo "  Worker did not answer http://${MGMT}/healthz within 180s. It is NOT connected yet." >&2
+  echo "  The restart loop is still running (pid $(cat "$pid_file" 2>/dev/null || echo unknown))." >&2
   echo "  Last log lines ($LOG):" >&2
   tail -40 "$LOG" 2>/dev/null || echo "  (no log file yet)" >&2
   exit 1
