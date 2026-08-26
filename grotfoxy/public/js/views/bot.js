@@ -127,6 +127,7 @@ export async function renderBot(root, botId) {
       sensitive: 'Asks before sensitive actions',
       always: 'Asks before every tool',
     }[bot.approvalPolicy] ?? bot.approvalPolicy),
+    summaryRow('Tool calls', bot.parallelTools ? 'Several per turn allowed' : 'One at a time'),
     summaryRow('Limits', `${bot.maxSteps} steps · ${bot.maxSeconds}s · ${money(bot.maxCostUsd)} per run`),
     summaryRow('Schedule', bot.scheduleOn ? `${bot.scheduleLabel} — ${bot.scheduleTask || 'no task set'}` : 'Off'),
     summaryRow(

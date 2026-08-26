@@ -29,6 +29,7 @@ export function toPublicBot(row) {
     tools: parseJson(row.tools, []),
     connectors: parseJson(row.connectors, []),
     approvalPolicy: row.approval_policy,
+    parallelTools: Boolean(row.parallel_tools),
     maxSteps: row.max_steps,
     maxSeconds: row.max_seconds,
     maxCostUsd: row.max_cost_usd,
@@ -76,10 +77,10 @@ export function createBot(input = {}) {
   run(
     `INSERT INTO bots (
        id, name, emoji, color, job, context, boundaries, provider_id, model, temperature,
-       tools, connectors, approval_policy, max_steps, max_seconds, max_cost_usd,
+       tools, connectors, approval_policy, parallel_tools, max_steps, max_seconds, max_cost_usd,
        allowed_hosts, shell_allow, shell_deny, schedule_cron, schedule_task, schedule_on,
        next_run_at, notify_on, enabled, created_at, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     id,
     input.name?.trim() || 'New teammate',
     input.emoji ?? '',
@@ -93,6 +94,7 @@ export function createBot(input = {}) {
     JSON.stringify(input.tools ?? DEFAULT_TOOLS),
     JSON.stringify(input.connectors ?? []),
     input.approvalPolicy || 'sensitive',
+    input.parallelTools ? 1 : 0,
     clampInt(input.maxSteps, 1, 200, 25),
     clampInt(input.maxSeconds, 30, 21_600, 900),
     Number.isFinite(input.maxCostUsd) ? input.maxCostUsd : 1,
@@ -156,6 +158,10 @@ export function updateBot(id, input = {}) {
     if (input[key] === undefined) continue;
     assignments.push(`${column} = ?`);
     values.push(JSON.stringify(input[key]));
+  }
+  if (input.parallelTools !== undefined) {
+    assignments.push('parallel_tools = ?');
+    values.push(input.parallelTools ? 1 : 0);
   }
   for (const key of ['enabled', 'archived']) {
     if (input[key] === undefined) continue;

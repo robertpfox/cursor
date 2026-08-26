@@ -1,5 +1,10 @@
 /* GrotFoxy — dark, dense, and readable on a phone at 2am. */
 
+/* Several shells below set `display` on the same element that carries `hidden`.
+   Class and attribute selectors have equal specificity, so without this the
+   later class rule silently wins and the element stays on screen. */
+[hidden] { display: none !important; }
+
 :root {
   --bg: #0b0d12;
   --bg-soft: #10131b;

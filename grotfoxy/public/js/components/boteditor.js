@@ -181,6 +181,7 @@ export async function openBotEditor(bot = null, { isNew = !bot?.id } = {}) {
     h('option', { value: 'always', selected: draft.approvalPolicy === 'always' }, 'Ask before every tool'),
   );
 
+  const parallelTools = h('input', { type: 'checkbox', checked: Boolean(draft.parallelTools) });
   const maxSteps = h('input', { type: 'number', value: draft.maxSteps, min: '1', max: '200' });
   const maxSeconds = h('input', { type: 'number', value: draft.maxSeconds, min: '30', max: '21600' });
   const maxCostUsd = h('input', { type: 'number', value: draft.maxCostUsd, step: '0.25', min: '0' });
@@ -289,6 +290,20 @@ export async function openBotEditor(bot = null, { isNew = !bot?.id } = {}) {
             : h('p', { class: 'hint' }, 'No connectors yet. Add MCP servers in Settings → Connectors to reach Gmail, Slack, GitHub, your smart home and more.'),
         ),
         field('Approval policy', approvalPolicy),
+        h(
+          'label',
+          { class: 'check' },
+          parallelTools,
+          h(
+            'span',
+            h('span', 'Allow several tool calls in one turn'),
+            h(
+              'span',
+              { class: 'hint', style: { display: 'block' } },
+              'Off is safer: smaller models often ask for a second tool before they have the first one\u2019s result, and fill the gap with placeholder text. Turn it on for a strong model when speed matters.',
+            ),
+          ),
+        ),
       ),
     ),
     tab(
@@ -370,6 +385,7 @@ export async function openBotEditor(bot = null, { isNew = !bot?.id } = {}) {
         tools: toolChips.value(),
         connectors: connectorChips.value(),
         approvalPolicy: approvalPolicy.value,
+        parallelTools: parallelTools.checked,
         maxSteps: Number(maxSteps.value),
         maxSeconds: Number(maxSeconds.value),
         maxCostUsd: Number(maxCostUsd.value),

@@ -39,8 +39,33 @@ export function openDatabase(file = config.databaseFile) {
   database.exec('PRAGMA synchronous = NORMAL;');
   const schema = fs.readFileSync(path.join(here, 'schema.sql'), 'utf8');
   database.exec(schema);
+  migrate(database);
   log.debug(`database ready at ${file}`);
   return database;
+}
+
+/**
+ * `CREATE TABLE IF NOT EXISTS` does nothing for a database that already exists,
+ * so columns added after a release need backfilling here. GrotFoxy instances
+ * live on one machine for a long time and are upgraded by pulling; they never
+ * get a fresh database.
+ */
+const ADDED_COLUMNS = [
+  ['bots', 'parallel_tools', 'INTEGER NOT NULL DEFAULT 0'],
+  ['approvals', 'kind', "TEXT NOT NULL DEFAULT 'approval'"],
+  ['approvals', 'tool_call_id', "TEXT NOT NULL DEFAULT ''"],
+];
+
+function migrate(handle) {
+  for (const [table, column, definition] of ADDED_COLUMNS) {
+    const exists = handle
+      .prepare(`PRAGMA table_info(${table})`)
+      .all()
+      .some((row) => row.name === column);
+    if (exists) continue;
+    handle.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    log.info(`migrated: added ${table}.${column}`);
+  }
 }
 
 export function db() {

@@ -316,8 +316,53 @@ function pendingToolCalls(messages) {
   return lastAssistant.toolCalls.filter((call) => !answered.has(call.id));
 }
 
+/**
+ * Names what just ran, so the model does not simply repeat the whole batch on
+ * its next turn. Without the "do not call it again" clause, small models loop:
+ * they re-request both tools, the first runs a second time, and the dependent
+ * one is deferred forever.
+ */
+function sequentialSkipNote(ranCall, skippedCall) {
+  return [
+    `Not run yet. This teammate executes one tool per turn so each call can use the previous result.`,
+    `\`${ranCall.name}\` has already run and its result is in this conversation — do not call it again.`,
+    `Your next turn should call \`${skippedCall.name}\` on its own, filling its arguments with the real values from that result rather than any placeholder.`,
+  ].join(' ');
+}
+
 async function runToolCalls({ runId, bot, ctx, handlers, calls, signal }) {
-  for (const call of calls) {
+  let queue = calls;
+
+  // Answer the extras up front so the transcript stays complete even if the
+  // first call pauses for approval; on resume only that call is outstanding.
+  if (!bot.parallelTools && calls.length > 1) {
+    const answered = new Set(
+      loadMessages(runId)
+        .filter((message) => message.role === 'tool')
+        .map((message) => message.toolCallId),
+    );
+    for (const skipped of calls.slice(1)) {
+      if (answered.has(skipped.id)) continue;
+      appendMessage(runId, {
+        role: 'tool',
+        toolCallId: skipped.id,
+        name: skipped.name,
+        content: sequentialSkipNote(calls[0], skipped),
+      });
+    }
+    addStep(runId, {
+      kind: 'warning',
+      title: `Deferred ${calls.length - 1} parallel tool call(s)`,
+      detail: `Running ${calls[0].name} first. ${calls
+        .slice(1)
+        .map((call) => call.name)
+        .join(', ')} can be requested again once its result is in.`,
+      status: 'warning',
+    });
+    queue = calls.slice(0, 1);
+  }
+
+  for (const call of queue) {
     if (signal.aborted) return { cancelled: true };
 
     const handler = handlers.get(call.name);
@@ -495,7 +540,7 @@ async function wrapUp(runId, bot, provider, model, messages, signal, reason) {
     });
     const finished = finishRun(runId, {
       status: 'incomplete',
-      result: response.message.content ?? '',
+      result: response.message.content?.trim() || lastAssistantText(messages, reason),
       error: `Stopped at ${reason}`,
     });
     await maybeNotify(bot, finished);
@@ -503,11 +548,24 @@ async function wrapUp(runId, bot, provider, model, messages, signal, reason) {
   } catch (error) {
     const finished = finishRun(runId, {
       status: 'incomplete',
+      result: lastAssistantText(messages, reason),
       error: `Stopped at ${reason}; the summary call also failed: ${error.message}`,
     });
     await maybeNotify(bot, finished);
     return finished;
   }
+}
+
+/**
+ * Fallback when the wrap-up call comes back empty. Showing the bot's last words
+ * beats showing "(no output)" on a run that clearly did work.
+ */
+function lastAssistantText(messages, reason) {
+  const spoken = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && message.content?.trim());
+  const prefix = `This run stopped at its ${reason} before reaching a conclusion.`;
+  return spoken ? `${prefix}\n\nIts last note was:\n\n${spoken.content.trim()}` : prefix;
 }
 
 /**

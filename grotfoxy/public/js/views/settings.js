@@ -217,15 +217,24 @@ export async function renderSettings(root) {
           {
             class: 'btn btn--ghost btn--sm',
             type: 'button',
-            onclick: async (event) => {
-              event.currentTarget.disabled = true;
+            // `event.currentTarget` is null once the handler resumes after an
+            // await, so hold the node itself.
+            onclick: async ({ target }) => {
+              const button = target.closest('button');
+              button.disabled = true;
               status.textContent = 'Testing…';
-              const result = await api.post(`/api/providers/${provider.id}/test`);
-              status.textContent = result.ok
-                ? `Reachable — ${result.models.length} models available`
-                : `Failed: ${result.error}`;
-              status.style.color = result.ok ? 'var(--green)' : 'var(--red)';
-              event.currentTarget.disabled = false;
+              try {
+                const result = await api.post(`/api/providers/${provider.id}/test`);
+                status.textContent = result.ok
+                  ? `Reachable — ${result.models.length} models available`
+                  : `Failed: ${result.error}`;
+                status.style.color = result.ok ? 'var(--green)' : 'var(--red)';
+              } catch (error) {
+                status.textContent = `Failed: ${error.message}`;
+                status.style.color = 'var(--red)';
+              } finally {
+                button.disabled = false;
+              }
             },
           },
           'Test',
@@ -321,15 +330,22 @@ export async function renderSettings(root) {
           {
             class: 'btn btn--ghost btn--sm',
             type: 'button',
-            onclick: async (event) => {
-              event.currentTarget.disabled = true;
+            onclick: async ({ target }) => {
+              const button = target.closest('button');
+              button.disabled = true;
               status.textContent = 'Connecting…';
-              const result = await api.post(`/api/connectors/${connector.id}/test`);
-              status.textContent = result.ok
-                ? `Ready — ${result.tools.length} tools: ${result.tools.slice(0, 5).map((tool) => tool.name).join(', ')}`
-                : `Failed: ${result.error}`;
-              status.style.color = result.ok ? 'var(--green)' : 'var(--red)';
-              event.currentTarget.disabled = false;
+              try {
+                const result = await api.post(`/api/connectors/${connector.id}/test`);
+                status.textContent = result.ok
+                  ? `Ready — ${result.tools.length} tools: ${result.tools.slice(0, 5).map((tool) => tool.name).join(', ')}`
+                  : `Failed: ${result.error}`;
+                status.style.color = result.ok ? 'var(--green)' : 'var(--red)';
+              } catch (error) {
+                status.textContent = `Failed: ${error.message}`;
+                status.style.color = 'var(--red)';
+              } finally {
+                button.disabled = false;
+              }
             },
           },
           'Test',

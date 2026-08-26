@@ -14,7 +14,7 @@
   "scripts": {
     "start": "node --experimental-sqlite --no-warnings src/index.js",
     "dev": "node --experimental-sqlite --no-warnings --watch src/index.js",
-    "test": "node --experimental-sqlite --no-warnings --test test/",
+    "test": "node --experimental-sqlite --no-warnings --test \"test/*.test.js\"",
     "reset-password": "node --experimental-sqlite --no-warnings bin/grotfoxy.js reset-password",
     "doctor": "node --experimental-sqlite --no-warnings bin/grotfoxy.js doctor"
   },

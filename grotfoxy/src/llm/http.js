@@ -37,6 +37,15 @@ export async function requestJson(url, options = {}, { retries = RETRY_DELAYS_MS
       response = await fetch(url, options);
     } catch (error) {
       if (options.signal?.aborted) throw new LlmError('Request cancelled', { retryable: false });
+      const code = connectionErrorCode(error);
+      // Nothing is listening, or the name does not resolve. Retrying just makes
+      // the owner wait longer to be told their model server is down.
+      if (code) {
+        throw new LlmError(
+          `Cannot reach the model endpoint at ${url} (${code}). Is the provider URL right, and is the server running?`,
+          { retryable: false },
+        );
+      }
       lastError = new LlmError(`Network error contacting ${url}: ${error.message}`, {
         retryable: true,
       });
@@ -70,6 +79,27 @@ export async function requestJson(url, options = {}, { retries = RETRY_DELAYS_MS
     await delay(attempt, options.signal);
   }
   throw lastError ?? new LlmError('Model request failed');
+}
+
+const HARD_CONNECTION_ERRORS = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EHOSTUNREACH', 'EAI_AGAIN']);
+
+/**
+ * Digs the real socket error out of a `fetch` failure. undici nests it under
+ * `cause`, and when a host resolves to both IPv4 and IPv6 it nests an
+ * AggregateError with one entry per attempt.
+ */
+function connectionErrorCode(error) {
+  const seen = new Set();
+  const queue = [error];
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current || typeof current !== 'object' || seen.has(current)) continue;
+    seen.add(current);
+    if (HARD_CONNECTION_ERRORS.has(current.code)) return current.code;
+    if (current.cause) queue.push(current.cause);
+    if (Array.isArray(current.errors)) queue.push(...current.errors);
+  }
+  return null;
 }
 
 function delay(attempt, signal) {

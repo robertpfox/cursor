@@ -84,6 +84,9 @@ CREATE TABLE IF NOT EXISTS bots (
   tools           TEXT NOT NULL DEFAULT '[]',
   connectors      TEXT NOT NULL DEFAULT '[]',
   approval_policy TEXT NOT NULL DEFAULT 'sensitive',
+  -- Off by default: small local models routinely emit a second tool call whose
+  -- arguments depend on the first one's result, which produces placeholder junk.
+  parallel_tools  INTEGER NOT NULL DEFAULT 0,
   max_steps       INTEGER NOT NULL DEFAULT 25,
   max_seconds     INTEGER NOT NULL DEFAULT 900,
   max_cost_usd    REAL NOT NULL DEFAULT 1.0,
