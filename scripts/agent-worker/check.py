@@ -86,6 +86,14 @@ def main() -> int:
     if 'throw "git is not on PATH' in bootstrap:
         errors.append("bootstrap-den.ps1 must not hard-fail when git is missing")
 
+    common = (SCRIPTS / "common.ps1").read_text(encoding="utf-8")
+    if "agent.exe" not in common or r"\.ps1$" not in common:
+        errors.append("common.ps1 must prefer agent.exe/agent.cmd over agent.ps1 for the scheduled task")
+    if "Get-ChildItem" not in common or "Recurse" not in common:
+        errors.append("common.ps1 must search %LOCALAPPDATA%\\cursor-agent recursively for agent.exe")
+    if 'call "$quotedAgent"' not in install:
+        errors.append("install-den.ps1 launcher must call the CLI so .cmd wrappers return to the restart loop")
+
     env_example = (SCRIPTS / "agent-worker.env.example").read_text(encoding="utf-8")
     if "CURSOR_API_KEY" not in env_example:
         errors.append("agent-worker.env.example missing CURSOR_API_KEY")

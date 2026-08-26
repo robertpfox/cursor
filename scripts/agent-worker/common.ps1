@@ -62,17 +62,33 @@ function Get-AgentWorkerLogDir {
 }
 
 function Find-AgentWorkerCli {
-    $cmd = Get-Command agent -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
-
+    # The CursorAgentWorker scheduled task is cmd.exe, so the path must be
+    # agent.exe or agent.cmd — not agent.ps1 (Get-Command agent often returns that).
     $candidates = @(
-        (Join-Path $env:USERPROFILE '.local\bin\agent.exe'),
-        (Join-Path $env:USERPROFILE '.local\bin\agent.cmd'),
         (Join-Path $env:LOCALAPPDATA 'cursor-agent\agent.exe'),
-        (Join-Path $env:USERPROFILE 'AppData\Local\cursor-agent\agent.exe')
+        (Join-Path $env:LOCALAPPDATA 'cursor-agent\cursor-agent.exe'),
+        (Join-Path $env:LOCALAPPDATA 'cursor-agent\agent.cmd'),
+        (Join-Path $env:LOCALAPPDATA 'cursor-agent\cursor-agent.cmd'),
+        (Join-Path $env:USERPROFILE '.local\bin\agent.exe'),
+        (Join-Path $env:USERPROFILE '.local\bin\agent.cmd')
     )
     foreach ($path in $candidates) {
         if (Test-Path -LiteralPath $path) { return $path }
+    }
+    $localRoot = Join-Path $env:LOCALAPPDATA 'cursor-agent'
+    if (Test-Path -LiteralPath $localRoot) {
+        foreach ($filter in @('agent.exe', 'cursor-agent.exe', 'agent.cmd')) {
+            $found = Get-ChildItem -Path $localRoot -Recurse -Filter $filter -ErrorAction SilentlyContinue |
+                Where-Object { $_.FullName -notmatch '\\node_modules\\' } |
+                Select-Object -First 1
+            if ($found) { return $found.FullName }
+        }
+    }
+    foreach ($name in @('agent.exe', 'cursor-agent.exe', 'agent.cmd')) {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue
+        if ($cmd -and $cmd.Source -and ($cmd.Source -notmatch '\.ps1$')) {
+            return $cmd.Source
+        }
     }
     return $null
 }
@@ -91,7 +107,7 @@ function Install-AgentWorkerCli {
 
     $installed = Find-AgentWorkerCli
     if (-not $installed) {
-        throw "The Cursor agent CLI installed but 'agent' is still not on PATH. Open a new PowerShell and re-run, or add %USERPROFILE%\.local\bin to PATH."
+        throw "The Cursor agent CLI installed but agent.exe is still not under %LOCALAPPDATA%\cursor-agent. Open a new PowerShell and re-run."
     }
     return $installed
 }

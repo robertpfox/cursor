@@ -116,7 +116,8 @@ if exist "$envFile" (
   )
 )
 :loop
-"$quotedAgent" worker --name "$Name" --worker-dir "$WorkerDir" --idle-release-timeout 0 --data-dir "$dataDir" --management-addr $($script:AgentWorkerManagementAddr) start --verbose >> "$logFile" 2>&1
+rem `call` is required when the CLI is agent.cmd; without it this batch file never returns to the restart loop.
+call "$quotedAgent" worker --name "$Name" --worker-dir "$WorkerDir" --idle-release-timeout 0 --data-dir "$dataDir" --management-addr $($script:AgentWorkerManagementAddr) start --verbose >> "$logFile" 2>&1
 echo [%date% %time%] worker exited %ERRORLEVEL%, restarting in 10s >> "$logFile"
 timeout /t 10 /nobreak > nul
 goto loop
