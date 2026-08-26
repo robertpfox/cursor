@@ -158,12 +158,15 @@ if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
         Write-BootOk "scheduled task $taskName (WSL worker at logon)"
         exit $wslCode
     }
-    Write-Host '    ! WSL exists but no distro is running. After `wsl --install -d Ubuntu` and a reboot, re-run this.' -ForegroundColor Yellow
+    Write-Host '    ! WSL exists but no Ubuntu distro is running. After `wsl --install -d Ubuntu` and a reboot, re-run this.' -ForegroundColor Yellow
 } else {
-    Write-Host '    ! WSL is not installed. Native Windows agent worker currently crashes (better-sqlite3 ABI).' -ForegroundColor Yellow
+    Write-Host '    ! WSL is not installed. The native Windows CLI currently crashes (better-sqlite3 ABI).' -ForegroundColor Yellow
     Write-Host '      Install Ubuntu WSL, reboot, then paste this one-liner again:' -ForegroundColor Yellow
     Write-Host '        wsl --install -d Ubuntu' -ForegroundColor Yellow
 }
+
+Write-Host 'Refusing to start the broken native Windows CLI. Use Ubuntu WSL.' -ForegroundColor Yellow
+exit 1
 
 try {
     $root = Resolve-WorkerDir -Hint $WorkerDir

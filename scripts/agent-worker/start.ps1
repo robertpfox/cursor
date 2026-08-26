@@ -47,6 +47,22 @@ if (-not $WorkerDir) { $WorkerDir = $repoRoot }
 
 Import-AgentWorkerEnv (Get-AgentWorkerEnvPath $repoRoot)
 
+if (Test-AgentWorkerWsl) {
+    $den = 'curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.sh | bash'
+    Write-Host "  wsl.exe -d $(Get-AgentWorkerWslDistro) -e bash -lc `"$den`""
+    if ($DryRun) { exit 0 }
+    Write-AgentWorkerStep 'Native Windows CLI currently crashes. Starting via Ubuntu WSL.'
+    $code = Invoke-AgentWorkerWsl -WslArgs @('-e', 'bash', '-lc', $den)
+    exit $code
+}
+
+if (-not $env:AGENT_WORKER_ALLOW_NATIVE) {
+    Write-Host 'Ubuntu WSL is required. The native Windows CLI currently crashes (better-sqlite3 ABI).' -ForegroundColor Yellow
+    Write-Host '  wsl --install -d Ubuntu'
+    Write-Host 'Or Win+R: powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.ps1 | iex"'
+    exit 1
+}
+
 $agentPath = Find-AgentWorkerCli
 if (-not $agentPath) {
     throw "The Cursor agent CLI is not installed. Run scripts\agent-worker\install-den.ps1 or: irm 'https://cursor.com/install?win32=true' | iex"

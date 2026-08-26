@@ -68,6 +68,12 @@ def main() -> int:
         if needle not in start_sh:
             errors.append(f"start.sh missing {needle!r}")
 
+    start_ps1 = (SCRIPTS / "start.ps1").read_text(encoding="utf-8")
+    if "AGENT_WORKER_ALLOW_NATIVE" not in start_ps1:
+        errors.append("start.ps1 must refuse native Windows CLI unless AGENT_WORKER_ALLOW_NATIVE is set")
+    if "den.sh" not in start_ps1:
+        errors.append("start.ps1 must start via Ubuntu WSL while the native CLI is broken")
+
     install = (SCRIPTS / "install-den.ps1").read_text(encoding="utf-8")
     if "CursorAgentWorker" not in install:
         errors.append("install-den.ps1 missing scheduled task name CursorAgentWorker")
@@ -93,6 +99,12 @@ def main() -> int:
         errors.append("bootstrap-den.ps1 must not hard-fail when git is missing")
     if "repo fetch failed" not in bootstrap:
         errors.append("bootstrap-den.ps1 must still start a worker if GitHub clone/zip fails")
+    if "Trying the native Windows CLI anyway" in install:
+        errors.append("install-den.ps1 must not try the broken native Windows CLI")
+    if "AGENT_WORKER_ALLOW_NATIVE" not in install:
+        errors.append("install-den.ps1 must refuse native start unless AGENT_WORKER_ALLOW_NATIVE is set")
+    if "Refusing to start the broken native Windows CLI" not in bootstrap:
+        errors.append("bootstrap-den.ps1 must refuse native Windows CLI when Ubuntu WSL is missing")
     if "install-den-wsl.sh" not in bootstrap and "Test-AgentWorkerWsl" not in (SCRIPTS / "install-den.ps1").read_text(
         encoding="utf-8"
     ):

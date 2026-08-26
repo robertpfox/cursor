@@ -46,7 +46,7 @@ Or download and double-click `scripts\agent-worker\Start-DenComputer-Worker.cmd`
 
 For boot-without-sign-in, put a *personal* user API key (https://cursor.com/dashboard/api) in `.cursor\agent-worker.env` as `CURSOR_API_KEY=key_...` before running the installer.
 
-The installer registers a Scheduled Task named `CursorAgentWorker`. With WSL it starts `wsl.exe` at logon. Native Windows fallback uses `powershell.exe`.
+The installer registers a Scheduled Task named `CursorAgentWorker`. With WSL it starts `wsl.exe` at logon. Native Windows start is refused while the CLI crash remains (override only with `AGENT_WORKER_ALLOW_NATIVE=1`).
 
 The installer **exits 1** unless `http://127.0.0.1:18791/healthz` answers within 60 seconds. A green "installed" line without that health check is not enough — `den-computer` must also appear under **Run on → My Machines** at [cursor.com/agents](https://cursor.com/agents).
 

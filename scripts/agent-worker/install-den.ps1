@@ -117,10 +117,13 @@ if (Test-AgentWorkerWsl) {
     exit $wslCode
 }
 
-if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
-    Write-AgentWorkerWarn 'WSL is not installed. Native Windows agent worker currently crashes (better-sqlite3 ABI).'
-    Write-AgentWorkerWarn 'Install WSL, reboot, and re-run:  wsl --install -d Ubuntu'
-    Write-AgentWorkerWarn 'Trying the native Windows CLI anyway in case Cursor has shipped a fix...'
+if (-not $env:AGENT_WORKER_ALLOW_NATIVE) {
+    Write-AgentWorkerWarn 'Ubuntu WSL is required. The native Windows CLI currently crashes (better-sqlite3 ABI).'
+    Write-AgentWorkerWarn 'Install it, reboot, then re-run this installer:'
+    Write-AgentWorkerWarn '  wsl --install -d Ubuntu'
+    Write-AgentWorkerWarn 'Or Win+R:'
+    Write-AgentWorkerWarn '  powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.ps1 | iex"'
+    exit 1
 }
 
 # --- 1. CLI ------------------------------------------------------------------
