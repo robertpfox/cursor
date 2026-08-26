@@ -11,8 +11,10 @@
 Native Windows `agent worker start` currently crashes. If Ubuntu WSL is already installed, Win+R this (opens `agent login` in the browser):
 
 ```text
-wsl -d Ubuntu -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh -o /tmp/install-den-wsl.sh && bash /tmp/install-den-wsl.sh"
+wsl -d Ubuntu -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/den.sh | bash"
 ```
+
+That wrapper only downloads the real installer to a file, then runs it. Do not pipe `install-den-wsl.sh` itself into bash.
 
 Use `-d Ubuntu-22.04` or `-d Ubuntu-24.04` if that is the distro name (`wsl -l -q`). Do not rely on the default distro — Docker Desktop often is.
 

@@ -151,15 +151,24 @@ def main() -> int:
     if "CursorAgentWorker" not in uninstall or "LocalAppData" not in uninstall:
         errors.append("uninstall-den.ps1 must remove the WSL logon launcher under LocalAppData")
 
+    den_sh = ROOT / "den.sh"
+    if not den_sh.is_file():
+        errors.append("missing den.sh Win+R wrapper at repo root")
+    else:
+        den_text = den_sh.read_text(encoding="utf-8")
+        if "agent login" in den_text:
+            errors.append("den.sh must not call agent login (curl|bash would steal stdin)")
+        if "install-den-wsl.sh" not in den_text:
+            errors.append("den.sh must download install-den-wsl.sh to a file and exec it")
+
     readme = (SCRIPTS / "README.md").read_text(encoding="utf-8")
     vscode_tasks = ROOT / ".vscode" / "tasks.json"
     if not vscode_tasks.is_file() or "Start den-computer My Machines worker" not in vscode_tasks.read_text(
         encoding="utf-8"
     ):
         errors.append("Missing VS Code task to start the Den Computer WSL worker")
-    if "install-den-wsl.sh" not in readme or "wsl -d Ubuntu" not in readme:
-        errors.append("README must lead with the WSL curl|bash one-liner targeting Ubuntu")
-        errors.append("README must lead with the WSL curl|bash one-liner")
+    if "den.sh" not in readme or "wsl -d Ubuntu" not in readme:
+        errors.append("README must lead with the short den.sh Win+R one-liner targeting Ubuntu")
     if "Start-DenComputer-Worker.cmd" not in readme:
         errors.append("README must mention the double-click WSL launcher")
 
