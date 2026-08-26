@@ -4,6 +4,8 @@
 
 **Do not run that command inside a Cursor-hosted Cloud Agent.** That registers the ephemeral VM. Run it on the Den Computer.
 
+**Windows native `agent worker start` currently crashes** when starting exec-daemon (`better-sqlite3` NODE_MODULE_VERSION 127 vs 137). Cursor’s workaround is the Linux CLI inside **WSL**, with the repo on the WSL filesystem (not `/mnt/c`). This installer does that when WSL is available.
+
 ## Windows (Den Computer)
 
 From Run (Win+R) on the Den Computer:
@@ -12,7 +14,13 @@ From Run (Win+R) on the Den Computer:
 powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/bootstrap-den.ps1 | iex"
 ```
 
-Or paste this in PowerShell (no checkout required). Git for Windows is optional — without it the script downloads a zip of this branch. If you are not signed in, a browser window opens for `agent login`:
+Or paste this in PowerShell (no checkout required). Git for Windows is optional — without it the script downloads a zip of this branch. If WSL (Ubuntu) is installed, bootstrap uses that and never runs the broken Windows CLI. If WSL is missing, install it first:
+
+```text
+wsl --install -d Ubuntu
+```
+
+Reboot if Windows asks, then paste the one-liner again. Finish `agent login` as robertpfox@gmail.com (personal user key, not team/org/service-account).
 
 ```powershell
 irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/bootstrap-den.ps1 | iex
@@ -30,7 +38,7 @@ Or double-click `scripts\agent-worker\start-den-worker.cmd`.
 
 For boot-without-sign-in, put a *personal* user API key (https://cursor.com/dashboard/api) in `.cursor\agent-worker.env` as `CURSOR_API_KEY=key_...` before running the installer.
 
-The installer registers a Scheduled Task named `CursorAgentWorker` that runs `powershell.exe` (so `agent.exe`, `agent.cmd`, and `agent.ps1` all work). As Administrator with an API key it starts at boot as SYSTEM; otherwise it starts at logon as you.
+The installer registers a Scheduled Task named `CursorAgentWorker`. With WSL it starts `wsl.exe` at logon. Native Windows fallback uses `powershell.exe`.
 
 The installer **exits 1** unless `http://127.0.0.1:18791/healthz` answers within 60 seconds. A green "installed" line without that health check is not enough — `den-computer` must also appear under **Run on → My Machines** at [cursor.com/agents](https://cursor.com/agents).
 

@@ -55,6 +55,59 @@ Write-Host ''
 
 Import-AgentWorkerEnv $envFile
 
+if (Test-AgentWorkerWsl) {
+    Write-AgentWorkerStep 'Windows native agent worker crashes on exec-daemon (better-sqlite3 ABI). Using WSL.'
+    $wslInstaller = Join-Path $PSScriptRoot 'install-den-wsl.sh'
+    $unixInstaller = $null
+    if (Test-Path -LiteralPath $wslInstaller) {
+        $unixInstaller = (wsl.exe wslpath -a $wslInstaller 2>$null)
+        if ($unixInstaller) { $unixInstaller = [string]$unixInstaller.Trim() }
+    }
+    if ($unixInstaller) {
+        wsl.exe -e bash $unixInstaller
+    } else {
+        wsl.exe -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/agent-worker-start-4281/scripts/agent-worker/install-den-wsl.sh | bash"
+    }
+    $wslCode = $LASTEXITCODE
+
+    Write-AgentWorkerStep 'Registering a logon task that keeps the WSL worker up'
+    $wslCmd = Join-Path $PSScriptRoot 'start-den-wsl.cmd'
+    $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    if ($existing) {
+        Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+    }
+    $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$wslCmd`"" -WorkingDirectory $repoRoot
+    $settings = New-ScheduledTaskSettingsSet `
+        -AllowStartIfOnBatteries `
+        -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable `
+        -RestartCount 999 `
+        -RestartInterval (New-TimeSpan -Minutes 1) `
+        -ExecutionTimeLimit ([TimeSpan]::Zero) `
+        -MultipleInstances IgnoreNew
+    $trigger = New-ScheduledTaskTrigger -AtLogOn
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
+        -Settings $settings -Description "Cursor My Machines worker ($Name) via WSL" | Out-Null
+    Write-AgentWorkerOk 'task registered to start WSL worker when you sign in'
+
+    if ($wslCode -ne 0) {
+        Write-Host ''
+        Write-Host '  WSL worker did not become healthy. Typical causes:' -ForegroundColor Yellow
+        Write-Host '    - agent login was cancelled'
+        Write-Host '    - wsl --install -d Ubuntu was never finished (reboot required)'
+        Write-Host '    - git is missing inside WSL (sudo apt-get install -y git curl)'
+        Write-Host ''
+    }
+    exit $wslCode
+}
+
+if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
+    Write-AgentWorkerWarn 'WSL is not installed. Native Windows agent worker currently crashes (better-sqlite3 ABI).'
+    Write-AgentWorkerWarn 'Install WSL, reboot, and re-run:  wsl --install -d Ubuntu'
+    Write-AgentWorkerWarn 'Trying the native Windows CLI anyway in case Cursor has shipped a fix...'
+}
+
 # --- 1. CLI ------------------------------------------------------------------
 
 Write-AgentWorkerStep 'Checking the Cursor agent CLI'

@@ -112,6 +112,38 @@ Write-Host ''
 Write-Host '  Den Computer My Machines bootstrap' -ForegroundColor White
 Write-Host ''
 
+if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
+    wsl.exe -e true 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-BootStep 'WSL is ready; using the Linux CLI (Windows agent worker currently crashes)'
+        wsl.exe -e bash -lc "curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/$Branch/scripts/agent-worker/install-den-wsl.sh | bash"
+        $wslCode = $LASTEXITCODE
+        $taskName = 'CursorAgentWorker'
+        $cmdPath = Join-Path $env:TEMP 'start-den-wsl.cmd'
+        @(
+            '@echo off',
+            'wsl.exe -e bash -lc "export PATH=$HOME/.local/bin:$PATH; exec bash $HOME/cursor/scripts/agent-worker/wsl-worker-loop.sh"'
+        ) | Set-Content -Path $cmdPath -Encoding ASCII
+        $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        if ($existing) {
+            Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+        }
+        $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$cmdPath`""
+        $trigger = New-ScheduledTaskTrigger -AtLogOn
+        $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings `
+            -Description 'Cursor My Machines worker (den-computer) via WSL' | Out-Null
+        Write-BootOk "scheduled task $taskName (WSL worker at logon)"
+        exit $wslCode
+    }
+    Write-Host '    ! WSL exists but no distro is running. After `wsl --install -d Ubuntu` and a reboot, re-run this.' -ForegroundColor Yellow
+} else {
+    Write-Host '    ! WSL is not installed. Native Windows agent worker currently crashes (better-sqlite3 ABI).' -ForegroundColor Yellow
+    Write-Host '      Install Ubuntu WSL, reboot, then paste this one-liner again:' -ForegroundColor Yellow
+    Write-Host '        wsl --install -d Ubuntu' -ForegroundColor Yellow
+}
+
 try {
     $root = Resolve-WorkerDir -Hint $WorkerDir
     Write-BootOk "repo $root"

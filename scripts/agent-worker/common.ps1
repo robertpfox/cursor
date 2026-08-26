@@ -13,6 +13,12 @@ function Write-AgentWorkerStep($message) { Write-Host "==> $message" -Foreground
 function Write-AgentWorkerOk($message) { Write-Host "    $([char]0x2713) $message" -ForegroundColor Green }
 function Write-AgentWorkerWarn($message) { Write-Host "    ! $message" -ForegroundColor Yellow }
 
+function Test-AgentWorkerWsl {
+    if (-not (Get-Command wsl.exe -ErrorAction SilentlyContinue)) { return $false }
+    wsl.exe -e true 2>$null | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
 function Test-AgentWorkerAdmin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     return ([Security.Principal.WindowsPrincipal]$identity).IsInRole(

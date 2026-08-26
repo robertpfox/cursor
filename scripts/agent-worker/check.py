@@ -16,6 +16,9 @@ REQUIRED = [
     "uninstall-den.ps1",
     "bootstrap-den.ps1",
     "start-den-worker.cmd",
+    "start-den-wsl.cmd",
+    "install-den-wsl.sh",
+    "wsl-worker-loop.sh",
     "start.sh",
     "README.md",
     "agent-worker.env.example",
@@ -89,6 +92,17 @@ def main() -> int:
         errors.append("bootstrap-den.ps1 must not hard-fail when git is missing")
     if "repo fetch failed" not in bootstrap:
         errors.append("bootstrap-den.ps1 must still start a worker if GitHub clone/zip fails")
+    if "install-den-wsl.sh" not in bootstrap and "Test-AgentWorkerWsl" not in (SCRIPTS / "install-den.ps1").read_text(
+        encoding="utf-8"
+    ):
+        errors.append("Windows installers must prefer WSL while the native worker is broken")
+    wsl_install = (SCRIPTS / "install-den-wsl.sh").read_text(encoding="utf-8")
+    if "better-sqlite3" not in wsl_install:
+        errors.append("install-den-wsl.sh must document the Windows exec-daemon crash")
+    if "/mnt/c" not in wsl_install:
+        errors.append("install-den-wsl.sh must keep the worker-dir off /mnt/c")
+    if "pkill -f" in wsl_install:
+        errors.append("install-den-wsl.sh must not pkill by pattern")
 
     common = (SCRIPTS / "common.ps1").read_text(encoding="utf-8")
     if "agent.exe" not in common or r"\.ps1$" not in common:
