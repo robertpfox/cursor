@@ -31,6 +31,13 @@ if [[ -n "${CURSOR_AGENT:-}" || -n "${CURSOR_AGENT_SOCKET:-}" ]]; then
   fi
 fi
 
+echo "==> Ensuring git and curl are installed"
+if ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  sudo apt-get update -y
+  sudo apt-get install -y git curl ca-certificates
+fi
+
 echo "==> Installing the Cursor agent CLI (Linux)"
 if [[ ! -x "${HOME}/.local/bin/agent" ]]; then
   curl -fsSL https://cursor.com/install | bash
