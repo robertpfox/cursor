@@ -1,4 +1,4 @@
 {
   "name": "Cursor user config",
-  "install": "bash scripts/cloud-agent-install.sh"
+  "install": "python3 -c \"import yaml\" >/dev/null 2>&1 || { sudo apt-get update -y && sudo apt-get install -y python3-yaml; }\nif [ -f scripts/cloud-agent-install.sh ]; then bash scripts/cloud-agent-install.sh; else echo \"scripts/cloud-agent-install.sh not present on this ref yet; base tooling verified\"; fi"
 }

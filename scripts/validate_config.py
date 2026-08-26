@@ -50,6 +50,7 @@ JSONC_FILES = {".cursor/argv.json"}
 
 # Strict JSON config files that must always parse.
 STRICT_JSON_FILES = [
+    ".cursor/environment.json",
     ".cursor/mcp.json",
     ".cursor/cli-config.json",
     ".cursor/ide_state.json",
