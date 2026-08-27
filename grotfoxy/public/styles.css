@@ -348,6 +348,8 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .chip input { display: none; }
 .chip__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; }
 .chip--danger.is-on { background: rgba(248, 113, 113, 0.14); border-color: rgba(248, 113, 113, 0.4); color: #fca5a5; }
+.chip.is-locked { opacity: 0.45; cursor: not-allowed; text-decoration: line-through; }
+.chip.is-locked:hover { border-color: var(--line); color: var(--muted); }
 
 /* ---------- status pills ---------- */
 

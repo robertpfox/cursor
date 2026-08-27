@@ -256,6 +256,10 @@ foreach ($address in $addresses) {
     Write-Host "  From your phone:  http://${address}:$Port"
 }
 Write-Host ''
+Write-Host '  Network: serving your own network only. Requests from outside it get a'
+Write-Host '           403, including anything forwarded in by a tunnel. The firewall'
+Write-Host '           rule covers private and domain profiles, never public.'
+Write-Host ''
 Write-Host "  State:   $StateDir   (back this up)"
 Write-Host ''
 Write-Host '  Open it and create your owner account. Then add a model provider'

@@ -286,6 +286,8 @@ Environment variables, or a `.env` beside `package.json`:
 | `GROTFOXY_MAX_CONCURRENT_RUNS` | `3` | Runs executing at once |
 | `GROTFOXY_SCHEDULER` | `true` | Set false to disable cron |
 | `GROTFOXY_ALLOW_SETUP` | `true` | Set false once the owner exists |
+| `GROTFOXY_LAN_ONLY` | `true` | Serve only callers on your own network |
+| `GROTFOXY_DISABLE_TOOLS` | *(none)* | Comma list of tools no bot may use |
 | `GROTFOXY_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ## CLI
@@ -296,12 +298,42 @@ npm run reset-password  # reset a password and sign out every session
 node bin/grotfoxy.js create-owner
 ```
 
-## Security notes
+## Staying on your own network
 
-GrotFoxy is built for a machine on your own network. If you expose it to the
-internet, put it behind a reverse proxy with TLS, set `GROTFOXY_ALLOW_SETUP=false`
-once your account exists, and remember that a bot with `run_command` can do
-anything you can do on that box.
+GrotFoxy answers only callers on your own network, and this is enforced by the
+server rather than left to configuration you have to remember. A request is
+served when the socket peer is a private address **and**, if it arrived through
+a proxy, the original client in `X-Forwarded-For` was private too. Anything else
+gets a 403.
+
+Both halves matter. Binding `0.0.0.0` so your phone can reach the Den Computer
+also answers a port forward or a tunnel, and a tunnel daemon running on the host
+connects over loopback — so a socket check on its own would wave the entire
+internet through. A forged `X-Forwarded-For` cannot grant access either, because
+the socket still has to be private.
+
+Private means loopback, `10/8`, `172.16/12`, `192.168/16`, link-local,
+`fc00::/7`, and `100.64/10` so Tailscale works.
+
+Turn it off only when something in front of GrotFoxy is doing real access
+control:
+
+```
+GROTFOXY_LAN_ONLY=false
+```
+
+### Locking tools down
+
+`GROTFOXY_DISABLE_TOOLS=run_command,delete_file` removes tools instance-wide.
+It is enforced in the runtime, not in each bot's configuration, so it still
+holds if someone with your password edits a bot and ticks the box back on. Worth
+setting on any instance reachable by anyone but you.
+
+### Other notes
+
+If you do put it on the internet, use a reverse proxy with TLS, set
+`GROTFOXY_ALLOW_SETUP=false` once your account exists, and remember that a bot
+with `run_command` can do anything you can do on that box.
 
 Provider keys are encrypted with AES-256-GCM. Passwords are scrypt-hashed.
 Session and webhook tokens are stored only as SHA-256 digests. Nothing is

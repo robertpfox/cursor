@@ -195,6 +195,29 @@ export async function readJsonBody(req) {
   }
 }
 
+/**
+ * The scheme the browser actually used. GrotFoxy behind a TLS terminator —
+ * Caddy, nginx, a Cloudflare tunnel — only ever sees plain http on the socket,
+ * so without this the session cookie never gets marked Secure and generated
+ * links come out as http.
+ *
+ * Trusting the header unverified is safe for these two uses: forging it can
+ * only affect the forger's own request, and the worst outcome is a cookie their
+ * own browser then declines to send back.
+ */
+export function requestProtocol(req) {
+  const forwarded = String(req.headers['x-forwarded-proto'] ?? '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  if (forwarded === 'https' || forwarded === 'http') return forwarded;
+  return req.socket?.encrypted ? 'https' : 'http';
+}
+
+export function requestOrigin(req) {
+  return `${requestProtocol(req)}://${req.headers.host ?? 'localhost'}`;
+}
+
 export function parseCookies(header) {
   const out = {};
   for (const part of String(header ?? '').split(';')) {

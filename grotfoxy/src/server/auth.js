@@ -7,7 +7,7 @@ import {
   tokenDigest,
   verifyPassword,
 } from '../core/crypto.js';
-import { clearCookie, HttpError, setCookie, unauthorized } from './router.js';
+import { clearCookie, HttpError, requestProtocol, setCookie, unauthorized } from './router.js';
 
 export const SESSION_COOKIE = 'grotfoxy_session';
 
@@ -164,7 +164,7 @@ export function beginSession(ctx, user) {
   const { token, expires } = createSession(user.id, ctx.req.headers['user-agent'] ?? '');
   setCookie(ctx.res, SESSION_COOKIE, token, {
     expires,
-    secure: ctx.url.protocol === 'https:',
+    secure: requestProtocol(ctx.req) === 'https',
   });
   return user;
 }

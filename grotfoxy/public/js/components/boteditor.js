@@ -19,11 +19,22 @@ const SCHEDULE_PRESETS = [
 function chipGroup(items, selected, { danger = false } = {}) {
   const chosen = new Set(selected);
   const nodes = items.map((item) => {
-    const box = h('input', { type: 'checkbox', checked: chosen.has(item.value) });
+    const box = h('input', {
+      type: 'checkbox',
+      checked: chosen.has(item.value),
+      disabled: Boolean(item.disabled),
+    });
     const chip = h(
       'label',
       {
-        class: `chip${danger && item.danger ? ' chip--danger' : ''}${chosen.has(item.value) ? ' is-on' : ''}`,
+        class: [
+          'chip',
+          danger && item.danger ? 'chip--danger' : '',
+          chosen.has(item.value) ? 'is-on' : '',
+          item.disabled ? 'is-locked' : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
         title: item.title ?? '',
       },
       box,
@@ -155,9 +166,12 @@ export async function openBotEditor(bot = null, { isNew = !bot?.id } = {}) {
   const toolChips = chipGroup(
     toolsPayload.tools.map((tool) => ({
       value: tool.name,
-      label: tool.name,
-      title: `${tool.description} (${tool.sensitivity})`,
+      label: tool.disabled ? `${tool.name} (off instance-wide)` : tool.name,
+      title: tool.disabled
+        ? `Disabled on this instance via GROTFOXY_DISABLE_TOOLS. Ticking it here will not bring it back.`
+        : `${tool.description} (${tool.sensitivity})`,
       danger: tool.sensitivity === 'dangerous',
+      disabled: tool.disabled,
       icon: true,
     })),
     draft.tools,

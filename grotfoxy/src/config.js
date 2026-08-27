@@ -94,8 +94,25 @@ export const config = {
   // Setup mode lets the very first visitor claim the instance. Disable it on a
   // machine that is exposed beyond the LAN and provision the owner via the CLI.
   allowSetup: envBool('GROTFOXY_ALLOW_SETUP', true),
+  /**
+   * Serve only callers on your own network. On by default: this is a home
+   * server that binds 0.0.0.0 so your phone can reach it, and that same bind
+   * answers a port forward or a tunnel just as happily. Set false only when
+   * something in front of it is doing the access control.
+   */
+  lanOnly: envBool('GROTFOXY_LAN_ONLY', true),
   schedulerEnabled: envBool('GROTFOXY_SCHEDULER', true),
   maxConcurrentRuns: envInt('GROTFOXY_MAX_CONCURRENT_RUNS', 3),
+  /**
+   * Instance-wide tool kill switch, e.g. GROTFOXY_DISABLE_TOOLS=run_command.
+   * Enforced in the runtime rather than per bot, so it still holds if someone
+   * with the password edits a bot and ticks the box back on. Set this on any
+   * instance reachable from beyond your own network.
+   */
+  disabledTools: env('GROTFOXY_DISABLE_TOOLS', '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean),
   version: '1.0.0',
 };
 

@@ -3,6 +3,7 @@ import shellTools from './shell.js';
 import webTools from './web.js';
 import builtinTools from './builtin.js';
 import { callConnectorTool, connect, getConnector } from '../services/connectors.js';
+import config from '../config.js';
 import log from '../core/logger.js';
 
 export const BUILTIN_TOOLS = [...builtinTools, ...fileTools, ...webTools, ...shellTools];
@@ -16,12 +17,17 @@ export const TOOL_GROUPS = [
   { id: 'shell', label: 'Shell', description: 'Run commands on the host machine.' },
 ];
 
+export function isToolDisabled(name) {
+  return config.disabledTools.includes(name);
+}
+
 export function toolCatalog() {
   return BUILTIN_TOOLS.map((tool) => ({
     name: tool.name,
     group: tool.group,
     sensitivity: tool.sensitivity,
     description: tool.description,
+    disabled: isToolDisabled(tool.name),
   }));
 }
 
@@ -55,6 +61,8 @@ export async function buildToolset(bot) {
 
   for (const tool of BUILTIN_TOOLS) {
     if (!enabled.has(tool.name)) continue;
+    // Enforced here, not at the bot level, so editing a bot cannot re-enable it.
+    if (isToolDisabled(tool.name)) continue;
     tools.push({
       name: tool.name,
       description: tool.description,

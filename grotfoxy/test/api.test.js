@@ -257,6 +257,87 @@ describe('webhook triggers', () => {
   });
 });
 
+describe('lan-only guard', () => {
+  test('refuses a request a tunnel forwarded from the public internet', async () => {
+    const response = await fetch(`${origin}/healthz`, {
+      headers: { 'x-forwarded-for': '203.0.113.7' },
+    });
+    assert.equal(response.status, 403);
+    assert.match(await response.text(), /only answers callers on its own network/);
+  });
+
+  test('still serves a proxy forwarding a LAN visitor', async () => {
+    const response = await fetch(`${origin}/healthz`, {
+      headers: { 'x-forwarded-for': '192.168.1.44' },
+    });
+    assert.equal(response.status, 200);
+  });
+
+  test('the guard covers the API, not just static routes', async () => {
+    const response = await fetch(`${origin}/api/session`, {
+      headers: { 'x-forwarded-for': '203.0.113.7' },
+    });
+    assert.equal(response.status, 403);
+  });
+
+  test('webhook triggers are covered too', async () => {
+    const response = await fetch(`${origin}/hooks/anything/anytoken`, {
+      method: 'POST',
+      headers: { 'x-forwarded-for': '203.0.113.7', 'content-type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(response.status, 403);
+  });
+});
+
+describe('behind a TLS proxy', () => {
+  test('marks the session cookie Secure when the proxy says https', async () => {
+    const response = await fetch(`${origin}/api/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-forwarded-proto': 'https' },
+      body: JSON.stringify({ username: 'robert', password: 'a-good-long-password' }),
+    });
+    const cookie = (response.headers.getSetCookie?.() ?? []).find((entry) =>
+      entry.startsWith('grotfoxy_session='),
+    );
+    assert.ok(cookie, 'a session cookie should be issued');
+    assert.match(cookie, /;\s*Secure/, 'a proxied https request must yield a Secure cookie');
+  });
+
+  test('leaves it unmarked on a genuine plain-http request', async () => {
+    const response = await fetch(`${origin}/api/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'robert', password: 'a-good-long-password' }),
+    });
+    const cookie = (response.headers.getSetCookie?.() ?? []).find((entry) =>
+      entry.startsWith('grotfoxy_session='),
+    );
+    assert.ok(cookie);
+    assert.ok(!/;\s*Secure/.test(cookie), 'Secure over plain http would lock the owner out');
+  });
+
+  test('hands out webhook URLs on the scheme the browser actually used', async () => {
+    const created = await call('POST', '/api/bots', {
+      name: 'Proxied',
+      providerId,
+      model: 'fake-model-1',
+      tools: [],
+    });
+    const response = await fetch(`${origin}/api/bots/${created.body.id}/webhook`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-proto': 'https',
+        cookie: [...jar.entries()].map(([name, value]) => `${name}=${value}`).join('; '),
+      },
+      body: JSON.stringify({ enabled: true }),
+    });
+    const payload = await response.json();
+    assert.match(payload.url, /^https:\/\//, 'a proxied install must not advertise an http trigger URL');
+  });
+});
+
 describe('api tokens', () => {
   test('authenticate the same endpoints as a session', async () => {
     const { body } = await call('POST', '/api/tokens', { name: 'Home Assistant' });

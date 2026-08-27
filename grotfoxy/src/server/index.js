@@ -3,6 +3,7 @@ import config from '../config.js';
 import log from '../core/logger.js';
 import { Router, sendText, serveStatic } from './router.js';
 import { attachUser } from './auth.js';
+import { clientAddress, isLocalRequest } from '../core/network.js';
 import registerAuthRoutes from './routes/auth.js';
 import registerBotRoutes from './routes/bots.js';
 import registerRunRoutes from './routes/runs.js';
@@ -31,6 +32,18 @@ export function createServer() {
   return http.createServer(async (req, res) => {
     res.setHeader('x-content-type-options', 'nosniff');
     res.setHeader('referrer-policy', 'same-origin');
+
+    if (config.lanOnly && !isLocalRequest(req)) {
+      const { address } = clientAddress(req);
+      log.warn(`refused ${req.method} ${req.url} from ${address || 'unknown'} (not on this network)`);
+      sendText(
+        res,
+        403,
+        'GrotFoxy only answers callers on its own network.\n' +
+          'If you meant to reach it from outside, set GROTFOXY_LAN_ONLY=false and put real access control in front of it.\n',
+      );
+      return;
+    }
 
     try {
       const { handled } = await router.handle(req, res);

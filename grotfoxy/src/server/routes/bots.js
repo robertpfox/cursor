@@ -1,4 +1,4 @@
-import { badRequest, notFound } from '../router.js';
+import { badRequest, notFound, requestOrigin } from '../router.js';
 import { requireAuth } from '../auth.js';
 import {
   BOT_TEMPLATES,
@@ -102,7 +102,9 @@ export function registerBotRoutes(router) {
     return {
       enabled: true,
       token,
-      url: `${ctx.url.origin}/hooks/${bot.id}/${token}`,
+      // Origin from the forwarded scheme, so a proxied install hands out an
+      // https trigger URL rather than one that redirects or fails.
+      url: `${requestOrigin(ctx.req)}/hooks/${bot.id}/${token}`,
     };
   });
 

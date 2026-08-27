@@ -170,6 +170,10 @@ for address in $(hostname -I 2>/dev/null || true); do
   echo "  From your phone:  http://$address:$PORT"
 done
 echo
+echo "  Network:  serving your own network only. Requests from outside it get a"
+echo "            403, including anything forwarded in by a tunnel. Set"
+echo "            GROTFOXY_LAN_ONLY=false in .env to change that."
+echo
 echo "  State:   $STATE_DIR   (back this up)"
 echo "  Logs:    $APP_ROOT/scripts/service.sh logs"
 echo "  Control: $APP_ROOT/scripts/service.sh {start|stop|restart|status}"
