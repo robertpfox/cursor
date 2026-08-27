@@ -36,10 +36,15 @@
     powershell -ExecutionPolicy Bypass -File .\scripts\install-den.ps1 -Port 9000
 #>
 
+# Write-Host is the right call for an interactive installer: coloured progress
+# on a console is the point, and nothing downstream consumes this output.
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+    Justification = 'Interactive installer output is meant for a human console.')]
 [CmdletBinding()]
 param(
     [int]$Port = 8787,
     [string]$BindAddress = '0.0.0.0',
+    [string]$StateDir = (Join-Path $env:LOCALAPPDATA 'GrotFoxy'),
     [switch]$NoFirewall,
     [switch]$NoAutoStart
 )
@@ -88,6 +93,32 @@ if (Test-Path (Join-Path $AppRoot 'package-lock.json')) {
 
 # --- 2. Configuration --------------------------------------------------------
 
+# Deliberately outside the checkout: data\ is gitignored, so leaving the
+# database in the repo means `git clean -xdf` silently destroys every bot,
+# transcript and API key.
+Write-Step 'Preparing the state directory'
+foreach ($dir in @((Join-Path $StateDir 'data'), (Join-Path $StateDir 'workspace'), (Join-Path $AppRoot 'logs'))) {
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+}
+
+$stamp = Get-Date -Format 'yyyyMMddHHmmss'
+foreach ($legacy in @('data', 'workspace')) {
+    $src = Join-Path $AppRoot $legacy
+    $dest = Join-Path $StateDir $legacy
+    $hasSource = (Test-Path $src) -and (Get-ChildItem -LiteralPath $src -Force -ErrorAction SilentlyContinue)
+    $destEmpty = -not (Get-ChildItem -LiteralPath $dest -Force -ErrorAction SilentlyContinue)
+    if ($hasSource -and $destEmpty) {
+        Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force
+        # The backup goes outside the repo too. It contains master.key, so
+        # leaving it in a checkout is how a private key reaches a public commit.
+        $backupRoot = Join-Path $StateDir 'backups'
+        if (-not (Test-Path $backupRoot)) { New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null }
+        Move-Item -LiteralPath $src -Destination (Join-Path $backupRoot "$legacy-$stamp")
+        Write-Ok "migrated $legacy\ out of the checkout (backup in $backupRoot)"
+    }
+}
+Write-Ok "state lives in $StateDir"
+
 Write-Step 'Writing configuration'
 $envFile = Join-Path $AppRoot '.env'
 if (Test-Path $envFile) {
@@ -105,18 +136,12 @@ GROTFOXY_PORT=$Port
 # Encrypts stored API keys. Changing it makes existing keys unreadable.
 GROTFOXY_SECRET=$secret
 
-# GROTFOXY_DATA_DIR=D:\GrotFoxy\data
-# GROTFOXY_WORKSPACE_DIR=D:\GrotFoxy\workspace
+GROTFOXY_DATA_DIR=$(Join-Path $StateDir 'data')
+GROTFOXY_WORKSPACE_DIR=$(Join-Path $StateDir 'workspace')
 GROTFOXY_LOG_LEVEL=info
 "@ | Set-Content -Path $envFile -Encoding UTF8
     Write-Ok "created $envFile"
 }
-
-foreach ($dir in @('data', 'workspace', 'logs')) {
-    $path = Join-Path $AppRoot $dir
-    if (-not (Test-Path $path)) { New-Item -ItemType Directory -Path $path | Out-Null }
-}
-Write-Ok 'data, workspace and logs folders ready'
 
 # --- 3. Scheduled task -------------------------------------------------------
 
@@ -192,15 +217,24 @@ if (-not $NoAutoStart) {
     Write-Step 'Starting GrotFoxy'
     Start-ScheduledTask -TaskName $TaskName
     $ready = $false
+    $lastError = 'no response'
     foreach ($attempt in 1..30) {
         Start-Sleep -Milliseconds 700
         try {
             $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/healthz" -TimeoutSec 2
             if ($health.ok) { $ready = $true; break }
-        } catch { }
+        } catch {
+            # Expected while the service is still starting. Keep the last
+            # failure so it can be reported if it never comes up.
+            $lastError = $_.Exception.Message
+        }
     }
-    if ($ready) { Write-Ok 'GrotFoxy is responding' }
-    else { Write-Warn2 "Not responding yet. Check $AppRoot\logs\grotfoxy.log" }
+    if ($ready) {
+        Write-Ok 'GrotFoxy is responding'
+    } else {
+        Write-Warn2 "Nothing answering on port $Port after 21s. Last error: $lastError"
+        Write-Warn2 "Check $AppRoot\logs\grotfoxy.log"
+    }
 }
 
 # --- Done --------------------------------------------------------------------
@@ -218,6 +252,8 @@ Write-Host "  On this machine:  http://localhost:$Port"
 foreach ($address in $addresses) {
     Write-Host "  From your phone:  http://${address}:$Port"
 }
+Write-Host ''
+Write-Host "  State:   $StateDir   (back this up)"
 Write-Host ''
 Write-Host '  Open it and create your owner account. Then add a model provider'
 Write-Host '  in Settings - your own API key, or a local Ollama for zero cost.'

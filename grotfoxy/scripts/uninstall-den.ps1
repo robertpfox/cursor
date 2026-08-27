@@ -14,9 +14,12 @@
     workspace\ (all bot files). There is no undo.
 #>
 
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',
+    Justification = 'Interactive uninstaller output is meant for a human console.')]
 [CmdletBinding()]
 param(
     [int]$Port = 8787,
+    [string]$StateDir = (Join-Path $env:LOCALAPPDATA 'GrotFoxy'),
     [switch]$PurgeData
 )
 
@@ -34,15 +37,17 @@ Get-NetFirewallRule -DisplayName "GrotFoxy ($Port)" -ErrorAction SilentlyContinu
     Remove-NetFirewallRule -ErrorAction SilentlyContinue
 Write-Host '    done' -ForegroundColor Green
 
+Write-Host '==> Removing the generated launcher' -ForegroundColor Cyan
+$launcher = Join-Path $AppRoot 'scripts\run-grotfoxy.cmd'
+if (Test-Path $launcher) { Remove-Item -LiteralPath $launcher -Force }
+Write-Host '    done' -ForegroundColor Green
+
 if ($PurgeData) {
-    Write-Host '==> Deleting data and workspace' -ForegroundColor Yellow
-    foreach ($dir in @('data', 'workspace')) {
-        $path = Join-Path $AppRoot $dir
-        if (Test-Path $path) { Remove-Item -LiteralPath $path -Recurse -Force }
-    }
+    Write-Host "==> Deleting $StateDir" -ForegroundColor Yellow
+    if (Test-Path $StateDir) { Remove-Item -LiteralPath $StateDir -Recurse -Force }
     Write-Host '    purged' -ForegroundColor Green
 } else {
     Write-Host ''
-    Write-Host "  Your data is still at $AppRoot\data - re-running the installer picks up where you left off."
+    Write-Host "  Your data is still at $StateDir - re-running the installer picks up where you left off."
 }
 Write-Host ''

@@ -1,6 +1,13 @@
-node_modules/
+# Runtime state. The installers keep this outside the checkout, but a plain
+# `npm start` from a clone still creates it here, and it holds the master key
+# and every transcript — it must never be committed.
 data/
 workspace/
+logs/
+*.migrated-*
 *.log
+*.pid
+
+node_modules/
 .env
 .DS_Store
