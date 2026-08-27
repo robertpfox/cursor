@@ -182,14 +182,17 @@ $settings = New-ScheduledTaskSettingsSet `
     -MultipleInstances IgnoreNew
 
 if (Test-Admin) {
-    # SYSTEM keeps GrotFoxy up through sign-out and reboot, which is what an
-    # always-on teammate host needs.
+    # S4U runs at boot, without you signed in, and without a stored password —
+    # but as *you*, not SYSTEM. That matters: a bot with the run_command tool
+    # executes with whatever rights this task has, and handing an autonomous
+    # agent SYSTEM on your own machine is not a reasonable default.
     $trigger = New-ScheduledTaskTrigger -AtStartup
-    $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) `
+        -LogonType S4U -RunLevel Limited
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
         -Principal $principal -Settings $settings `
         -Description 'GrotFoxy - self-hosted AI teammates' | Out-Null
-    Write-Ok 'task registered to start at boot as SYSTEM'
+    Write-Ok "task registered to start at boot as $($principal.UserId) (not SYSTEM)"
 } else {
     $trigger = New-ScheduledTaskTrigger -AtLogOn
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
