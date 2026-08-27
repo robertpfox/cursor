@@ -127,6 +127,9 @@ CREATE TABLE IF NOT EXISTS runs (
   result        TEXT NOT NULL DEFAULT '',
   error         TEXT NOT NULL DEFAULT '',
   steps_used    INTEGER NOT NULL DEFAULT 0,
+  -- Milliseconds actually spent working, excluding time parked on an approval.
+  -- A run that waits overnight for a human must not burn its time budget doing so.
+  active_ms     INTEGER NOT NULL DEFAULT 0,
   tokens_in     INTEGER NOT NULL DEFAULT 0,
   tokens_out    INTEGER NOT NULL DEFAULT 0,
   cost_usd      REAL NOT NULL DEFAULT 0,

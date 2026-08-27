@@ -18,6 +18,7 @@ export function toPublicRun(row) {
     result: row.result,
     error: row.error,
     stepsUsed: row.steps_used,
+    activeMs: row.active_ms,
     tokensIn: row.tokens_in,
     tokensOut: row.tokens_out,
     costUsd: row.cost_usd,
@@ -136,6 +137,12 @@ export function updateRun(id, fields) {
     bus.publish('run.status', { runId: id, botId: record.botId, status: record.status, run: record });
   }
   return record;
+}
+
+/** Accumulate working time. Time parked on an approval is never passed here. */
+export function addActiveMs(id, ms) {
+  if (!(ms > 0)) return;
+  exec('UPDATE runs SET active_ms = active_ms + ? WHERE id = ?', Math.round(ms), id);
 }
 
 export function addUsage(id, { inputTokens = 0, outputTokens = 0, costUsd = 0 }) {

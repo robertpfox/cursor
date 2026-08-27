@@ -6,6 +6,7 @@ import path from 'node:path';
 import test, { after, before, describe } from 'node:test';
 
 import bootstrap from '../src/bootstrap.js';
+import { run as dbRun } from '../src/db/index.js';
 import { startFakeModel, waitForRun } from './helpers/fake-model.js';
 import { createProvider } from '../src/services/providers.js';
 import { botWorkspace, createBot, updateBot } from '../src/services/bots.js';
@@ -420,6 +421,43 @@ describe('sequential tool calls', () => {
 });
 
 describe('budgets', () => {
+  test('time parked on an approval does not burn the time budget', async () => {
+    const local = await startFakeModel([
+      { toolCalls: [{ id: 'c1', name: 'write_file', arguments: { path: 'slow.txt', content: 'x' } }] },
+      { content: 'Done after you got round to it.' },
+    ]);
+    const provider = createProvider({ name: 'Fake clock', kind: 'openai', baseUrl: local.baseUrl, apiKey: 'k' });
+    // A two-minute budget, then a wait far longer than that before approving.
+    const bot = makeBot({
+      providerId: provider.id,
+      name: 'Patient Clock',
+      approvalPolicy: 'sensitive',
+      maxSeconds: 120,
+    });
+
+    const started = startRun({ botId: bot.id, task: 'Write slow.txt.' });
+    const paused = await waitForRun(getRun, started.id);
+    assert.equal(paused.status, 'awaiting_approval');
+
+    const workedWhilePaused = getRun(started.id).activeMs;
+    assert.ok(workedWhilePaused < 5000, `only real work should be banked, got ${workedWhilePaused}ms`);
+
+    // Simulate the owner approving the next morning: rewind startedAt well past
+    // the budget. Wall-clock accounting would kill the run on resume.
+    const longAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    dbRun('UPDATE runs SET started_at = ? WHERE id = ?', longAgo, started.id);
+
+    const pending = listPending().filter((entry) => entry.runId === started.id);
+    decideApproval(pending[0].id, 'approved', {});
+    resumeRun(started.id);
+
+    const finished = await waitForRun(getRun, started.id);
+    assert.equal(finished.status, 'succeeded', `expected success, got ${finished.status}: ${finished.error}`);
+    assert.equal(finished.result, 'Done after you got round to it.');
+    assert.ok(finished.activeMs < 120_000, 'banked working time should stay under the budget');
+    await local.close();
+  });
+
   test('stops at the step ceiling and asks for a wrap-up report', async () => {
     // Three tool-calling turns exhaust maxSteps; the fourth call is the
     // tool-free wrap-up the runtime asks for.

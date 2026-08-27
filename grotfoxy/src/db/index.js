@@ -52,6 +52,7 @@ export function openDatabase(file = config.databaseFile) {
  */
 const ADDED_COLUMNS = [
   ['bots', 'parallel_tools', 'INTEGER NOT NULL DEFAULT 0'],
+  ['runs', 'active_ms', 'INTEGER NOT NULL DEFAULT 0'],
   ['approvals', 'kind', "TEXT NOT NULL DEFAULT 'approval'"],
   ['approvals', 'tool_call_id', "TEXT NOT NULL DEFAULT ''"],
 ];

@@ -89,8 +89,23 @@ database too).
 sudo ./scripts/install-linux.sh
 ```
 
-Installs a hardened systemd unit (`ProtectSystem=full`, `ProtectHome=read-only`,
-writes confined to the app tree) and enables it.
+On a systemd host this installs a hardened unit (`ProtectSystem=full`,
+`ProtectHome=read-only`, writes confined to the app tree) and enables it at
+boot.
+
+On a host that is not running systemd — a container, WSL without systemd, a
+minimal VM — the installer says so and falls back to a supervised background
+process that restarts GrotFoxy if it exits, with exponential backoff on a crash
+loop. Boot persistence is not possible there, so start it yourself after a
+reboot. No sudo is needed in that mode.
+
+Either way the same commands control it:
+
+```bash
+./scripts/service.sh status
+./scripts/service.sh restart
+./scripts/service.sh logs
+```
 
 ### Docker
 
@@ -135,7 +150,9 @@ Five tabs, matching how you would brief a person:
   how eagerly it should ask permission, and whether it may call several tools
   in one turn.
 - **Limits** — max steps, max seconds and max spend per run; allowed HTTP
-  hosts; allowed and blocked shell commands.
+  hosts; allowed and blocked shell commands. The seconds budget counts time the
+  run spends *working*, not wall clock, so a run parked on an approval
+  overnight still has its full budget when you get to it in the morning.
 - **Triggers** — cron schedule and the standing task to run on it.
 
 ### Built-in tools
@@ -214,15 +231,22 @@ run waiting on you costs nothing while it waits.
 
 ## Where things live
 
+State lives **outside the checkout**, because `data/` is gitignored and a
+`git clean -xdf` in the repo would otherwise wipe every bot, transcript and API
+key. The installers set this up and migrate any existing in-repo state.
+
 ```
-data/grotfoxy.db     everything: bots, runs, transcripts, memories, settings
-data/master.key      encrypts provider keys at rest (owner-readable only)
-workspace/<botId>/   each bot's private file area — the jail for file tools
-logs/grotfoxy.log    service output
+~/.grotfoxy/data/grotfoxy.db     everything: bots, runs, transcripts, memories, settings
+~/.grotfoxy/data/master.key      encrypts provider keys at rest (owner-readable only)
+~/.grotfoxy/workspace/<botId>/   each bot's private file area — the jail for file tools
+<checkout>/logs/grotfoxy.log     service output
 ```
 
-Back up by copying `data/`. Move to a new machine by copying `data/` and
-`workspace/`.
+On Windows the state directory is `%LOCALAPPDATA%\GrotFoxy`. Override either
+with `GROTFOXY_DATA_DIR` and `GROTFOXY_WORKSPACE_DIR` in `.env`.
+
+Back up by copying the state directory. Move to a new machine by copying it
+across and re-running the installer.
 
 ## Configuration
 
@@ -233,8 +257,8 @@ Environment variables, or a `.env` beside `package.json`:
 | `GROTFOXY_HOST` | `0.0.0.0` | Interface to bind. `127.0.0.1` keeps it local-only |
 | `GROTFOXY_PORT` | `8787` | Port |
 | `GROTFOXY_SECRET` | generated | Encrypts stored API keys |
-| `GROTFOXY_DATA_DIR` | `./data` | Database and master key |
-| `GROTFOXY_WORKSPACE_DIR` | `./workspace` | Bot file areas |
+| `GROTFOXY_DATA_DIR` | `~/.grotfoxy/data` | Database and master key |
+| `GROTFOXY_WORKSPACE_DIR` | `~/.grotfoxy/workspace` | Bot file areas |
 | `GROTFOXY_MAX_CONCURRENT_RUNS` | `3` | Runs executing at once |
 | `GROTFOXY_SCHEDULER` | `true` | Set false to disable cron |
 | `GROTFOXY_ALLOW_SETUP` | `true` | Set false once the owner exists |

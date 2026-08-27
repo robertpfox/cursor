@@ -13,6 +13,7 @@ import {
   findForToolCall,
 } from '../services/approvals.js';
 import {
+  addActiveMs,
   addStep,
   addUsage,
   appendMessage,
@@ -29,6 +30,8 @@ import {
 
 /** Runs currently executing, so they can be cancelled mid-flight. */
 const active = new Map();
+/** When the current execution pass began, for working-time accounting. */
+const passStartedAt = new Map();
 /** Runs waiting for a worker slot. */
 const queue = [];
 
@@ -103,6 +106,11 @@ function drain() {
         finishRun(runId, { status: 'failed', error: String(error.message ?? error) });
       })
       .finally(() => {
+        const startedAt = passStartedAt.get(runId);
+        if (startedAt !== undefined) {
+          addActiveMs(runId, Date.now() - startedAt);
+          passStartedAt.delete(runId);
+        }
         active.delete(runId);
         drain();
       });
@@ -211,7 +219,15 @@ async function execute(runId, signal) {
     addStep(runId, { kind: 'status', title: 'Resumed', detail: '' });
   }
 
-  const deadline = Date.parse(startedAt) + bot.maxSeconds * 1000;
+  // Budget against time actually spent working. Wall clock since startedAt
+  // would mean any run that waits overnight for an approval is dead on arrival
+  // the moment you approve it.
+  const passStart = Date.now();
+  const deadline = passStart + (bot.maxSeconds * 1000 - (getRun(runId).activeMs ?? 0));
+  // drain() banks this pass's elapsed time on every exit path, including a
+  // throw, so the budget only ever counts time the run was actually working.
+  passStartedAt.set(runId, passStart);
+
   let stepsUsed = getRun(runId).stepsUsed;
   // Rebuilt from the transcript so a run that paused for approval and resumed
   // still remembers what it skipped and whether it was already pushed back.
