@@ -18,7 +18,13 @@ SERVICE_NAME="grotfoxy"
 PORT="${PORT:-8787}"
 BIND="${BIND:-0.0.0.0}"
 RUN_USER="${SUDO_USER:-$(id -un)}"
-RUN_HOME="$(getent passwd "$RUN_USER" | cut -d: -f6)"
+# Under sudo, $HOME is root's, so look the invoking user's home up instead.
+# Without sudo, an explicitly set $HOME is the answer and must win.
+if [ -n "${SUDO_USER:-}" ]; then
+  RUN_HOME="$(getent passwd "$RUN_USER" | cut -d: -f6)"
+else
+  RUN_HOME="${HOME:-$(getent passwd "$RUN_USER" | cut -d: -f6)}"
+fi
 STATE_DIR="${GROTFOXY_STATE_DIR:-$RUN_HOME/.grotfoxy}"
 
 step() { printf '\033[36m==> %s\033[0m\n' "$1"; }

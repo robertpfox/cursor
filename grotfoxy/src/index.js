@@ -3,6 +3,7 @@ import config from './config.js';
 import log from './core/logger.js';
 import bootstrap from './bootstrap.js';
 import { closeDatabase } from './db/index.js';
+import { acquireInstanceLock, releaseInstanceLock } from './core/lock.js';
 import { purgeExpiredSessions } from './server/auth.js';
 import { startServer } from './server/index.js';
 import { recoverInterruptedRuns } from './runtime/runner.js';
@@ -21,6 +22,7 @@ function lanAddresses() {
 
 async function main() {
   bootstrap();
+  acquireInstanceLock();
   purgeExpiredSessions();
 
   const recovered = recoverInterruptedRuns();
@@ -49,6 +51,7 @@ async function main() {
     log.info(`${signal} received, shutting down`);
     stopScheduler();
     disconnectAll();
+    releaseInstanceLock();
     server.close(() => {
       closeDatabase();
       process.exit(0);
@@ -65,6 +68,12 @@ async function main() {
 }
 
 main().catch((error) => {
+  if (error.code === 'EGROTFOXYLOCKED') {
+    // Not a crash, and not something a supervisor should retry into a loop.
+    const indented = error.message.split('\n').map((line) => `  ${line}`).join('\n');
+    console.error(`\n${indented}\n`);
+    process.exit(2);
+  }
   log.error(`GrotFoxy failed to start: ${error.stack ?? error.message}`);
   process.exit(1);
 });

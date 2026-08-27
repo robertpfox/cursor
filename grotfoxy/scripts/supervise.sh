@@ -36,6 +36,13 @@ while true; do
   code=$?
   child=""
 
+  # Exit 2 means another instance already owns the database. Restarting cannot
+  # fix that, so stop rather than log the same refusal every few seconds.
+  if [ "$code" -eq 2 ]; then
+    log "another instance owns the data directory; not restarting"
+    exit 2
+  fi
+
   if [ $(( $(date +%s) - started )) -ge 60 ]; then
     delay=2   # it ran long enough to count as healthy; reset the backoff
   else
