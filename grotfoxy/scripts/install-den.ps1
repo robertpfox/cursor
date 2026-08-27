@@ -182,7 +182,7 @@ $settings = New-ScheduledTaskSettingsSet `
     -MultipleInstances IgnoreNew
 
 if (Test-Admin) {
-    # S4U runs at boot, without you signed in, and without a stored password —
+    # S4U runs at boot, without you signed in, and without a stored password,
     # but as *you*, not SYSTEM. That matters: a bot with the run_command tool
     # executes with whatever rights this task has, and handing an autonomous
     # agent SYSTEM on your own machine is not a reasonable default.

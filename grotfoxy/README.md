@@ -64,16 +64,40 @@ Everything the desktop app does, and the two things reviewers asked it for.
 
 ## Install on the Den Computer
 
-### Windows
+### One command
+
+GrotFoxy currently lives on a feature branch, so a `git pull` on an existing
+checkout of the default branch will not have it. The bootstrap fetches the code
+into its own folder, checks git and Node, and runs the platform installer. It
+never touches an existing checkout such as `C:\cursor`.
+
+**Windows** (PowerShell):
 
 ```powershell
-cd C:\cursor\GrotFoxy\grotfoxy
+irm https://raw.githubusercontent.com/robertpfox/cursor/cursor/grotfoxy-self-hosted-ai-teammates-bd6b/grotfoxy/scripts/bootstrap.ps1 | iex
+```
+
+**Linux / macOS**:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/robertpfox/cursor/cursor/grotfoxy-self-hosted-ai-teammates-bd6b/grotfoxy/scripts/bootstrap.sh | bash
+```
+
+Both land the app in `C:\GrotFoxy` / `~/GrotFoxy`, install it as a service, and
+print the URL. Override with `-InstallHome D:\GrotFoxy` or `GROTFOXY_HOME=...`.
+
+### Windows, from a checkout
+
+```powershell
+cd C:\GrotFoxy\grotfoxy
 powershell -ExecutionPolicy Bypass -File .\scripts\install-den.ps1
 ```
 
-Run it from an elevated PowerShell and GrotFoxy starts at boot as SYSTEM, so it
-keeps working when nobody is signed in. Without elevation it installs as a
-start-at-logon task instead. The installer also:
+Run it from an elevated PowerShell and GrotFoxy starts at boot and keeps working
+when nobody is signed in, using an S4U scheduled task — as you, not SYSTEM, and
+with no stored password. That distinction matters: a bot with the `run_command`
+tool runs with whatever rights the task holds. Without elevation it installs as
+a start-at-logon task instead. The installer also:
 
 - generates a `.env` with a random encryption secret,
 - registers a scheduled task that restarts GrotFoxy if it ever exits,

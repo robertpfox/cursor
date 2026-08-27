@@ -10,8 +10,8 @@
       3. Run the service installer.
       4. Open the app in your browser.
 
-    It deliberately does NOT touch an existing checkout such as C:\cursor —
-    checking a feature branch out over your live Cursor config would swap that
+    It deliberately does NOT touch an existing checkout such as C:\cursor.
+    Checking a feature branch out over your live Cursor config would swap that
     repo's contents out from under you.
 
 .PARAMETER Home
