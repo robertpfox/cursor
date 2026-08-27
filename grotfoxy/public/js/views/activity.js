@@ -1,5 +1,5 @@
 import api from '../api.js';
-import { compactNumber, h, money, mount, relTime } from '../dom.js';
+import { compactNumber, h, money, mount, plural, relTime } from '../dom.js';
 import { avatar, empty, statusPill, toast } from '../ui.js';
 import { navigate } from '../router.js';
 import store from '../store.js';
@@ -37,45 +37,53 @@ export async function renderActivity(root, { status = '' } = {}) {
     ),
   );
 
-  const spendChart = usage.byDay.length
-    ? h(
-        'div',
-        { class: 'card' },
-        h(
-          'div',
-          { class: 'card__head' },
-          h('h3', 'Last 30 days'),
-          h('span', { class: 'spacer' }),
-          h('span', { class: 'tiny muted' }, `${money(usage.totals.cost_usd)} of model usage · $0 in subscription fees`),
-        ),
-        h(
-          'div',
-          { class: 'row', style: { alignItems: 'flex-end', gap: '3px', height: '70px' } },
-          ...usage.byDay.map((day) => {
-            const max = Math.max(...usage.byDay.map((entry) => entry.runs || 0), 1);
-            const height = Math.max(4, Math.round(((day.runs || 0) / max) * 64));
-            return h('div', {
-              title: `${day.day}: ${day.runs} runs, ${money(day.cost_usd)}`,
-              style: {
-                flex: '1',
-                minWidth: '4px',
-                height: `${height}px`,
-                borderRadius: '3px',
-                background: day.runs ? 'linear-gradient(180deg, #fb923c, #ea6a0a)' : 'var(--line)',
-              },
-            });
-          }),
-        ),
-        h(
-          'div',
-          { class: 'row tiny muted', style: { marginTop: '8px' } },
-          h('span', `${compactNumber(usage.totals.tokens_in)} in`),
-          h('span', `${compactNumber(usage.totals.tokens_out)} out`),
-          h('span', { class: 'spacer' }),
-          h('span', `${usage.totals.runs} completed runs`),
-        ),
-      )
-    : null;
+  // Always plot the full window. Charting only the days that have rows makes
+  // two busy days fill the whole card and reads as though that is the trend.
+  const byDay = new Map(usage.byDay.map((entry) => [entry.day, entry]));
+  const series = [];
+  for (const cursor = new Date(`${usage.since}T00:00:00Z`); ; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const day = cursor.toISOString().slice(0, 10);
+    series.push(byDay.get(day) ?? { day, runs: 0, cost_usd: 0 });
+    if (day >= new Date().toISOString().slice(0, 10)) break;
+  }
+  const busiest = Math.max(...series.map((entry) => entry.runs || 0), 1);
+
+  const spendChart = h(
+    'div',
+    { class: 'card' },
+    h(
+      'div',
+      { class: 'card__head' },
+      h('h3', 'Last 30 days'),
+      h('span', { class: 'spacer' }),
+      h('span', { class: 'tiny muted' }, `${money(usage.totals.cost_usd)} of model usage · $0 in subscription fees`),
+    ),
+    h(
+      'div',
+      { style: { display: 'flex', alignItems: 'flex-end', gap: '3px', height: '70px' } },
+      ...series.map((day) =>
+        h('div', {
+          title: `${day.day}: ${plural(day.runs || 0, 'run')}, ${money(day.cost_usd)}`,
+          style: {
+            flex: '1 1 0',
+            minWidth: '0',
+            height: `${Math.max(3, Math.round(((day.runs || 0) / busiest) * 64))}px`,
+            borderRadius: '2px',
+            background: day.runs ? 'linear-gradient(180deg, #fb923c, #ea6a0a)' : 'var(--line-soft)',
+          },
+        }),
+      ),
+    ),
+    h(
+      'div',
+      { class: 'row tiny muted', style: { marginTop: '8px' } },
+      h('span', series[0].day),
+      h('span', { class: 'spacer' }),
+      h('span', `${compactNumber(usage.totals.tokens_in)} in`),
+      h('span', `${compactNumber(usage.totals.tokens_out)} out`),
+      h('span', plural(usage.totals.runs, 'completed run')),
+    ),
+  );
 
   mount(
     root,
