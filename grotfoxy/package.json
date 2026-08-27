@@ -1,0 +1,23 @@
+{
+  "name": "grotfoxy",
+  "version": "1.0.0",
+  "description": "Self-hosted autonomous AI teammates. No subscription, no seat fees, bring your own key (or run fully local).",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "bin": {
+    "grotfoxy": "./bin/grotfoxy.js"
+  },
+  "scripts": {
+    "start": "node --experimental-sqlite --no-warnings src/index.js",
+    "dev": "node --experimental-sqlite --no-warnings --watch src/index.js",
+    "test": "node --experimental-sqlite --no-warnings --test \"test/*.test.js\"",
+    "reset-password": "node --experimental-sqlite --no-warnings bin/grotfoxy.js reset-password",
+    "doctor": "node --experimental-sqlite --no-warnings bin/grotfoxy.js doctor"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

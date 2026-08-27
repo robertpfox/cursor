@@ -1,0 +1,23 @@
+services:
+  grotfoxy:
+    build: .
+    image: grotfoxy:latest
+    container_name: grotfoxy
+    restart: unless-stopped
+    ports:
+      - '8787:8787'
+    environment:
+      # Set this to a long random string and keep it. Changing it makes stored
+      # provider API keys unreadable.
+      GROTFOXY_SECRET: ${GROTFOXY_SECRET:-change-me-to-a-long-random-string}
+      GROTFOXY_LOG_LEVEL: info
+    volumes:
+      - grotfoxy-data:/data
+      - grotfoxy-workspace:/workspace
+    # Lets bots reach an Ollama running on the host at http://host.docker.internal:11434
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+volumes:
+  grotfoxy-data:
+  grotfoxy-workspace:
